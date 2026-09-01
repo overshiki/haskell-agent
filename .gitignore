@@ -12,3 +12,6 @@
 # Fetched from openai/codex by nix (see flake.nix codexModelsJson); not vendored.
 packages/agent-openai/data/models.json
 packages/agent-openai/data/prompt.md
+packages/agent-openai/data
+cabal.project.local
+.cabal-build-aux

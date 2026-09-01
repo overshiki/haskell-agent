@@ -9,7 +9,7 @@ module Agent.Codex.Dialect.Tools
     , shellCommandIsReadOnly
     ) where
 
-import Agent.OsPath (fromText)
+import Agent.OsPath (fromText, unsafeEncodeUtf)
 import qualified Agent.Json.Decode as Json
 import Agent.ToolDSL
     ( PropertySchema(..)
@@ -76,7 +76,6 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text
-import System.OsPath (unsafeEncodeUtf)
 
 codexTools
     :: ToolEnv

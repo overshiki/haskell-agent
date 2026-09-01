@@ -63,7 +63,8 @@ import Data.IORef (newIORef)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 
 sanitizeTaskName :: Text -> Text
 sanitizeTaskName =

@@ -8,10 +8,10 @@ import Agent.CLI.Runtime.Orchestration.Types ( AgentRunMode, backgroundRunMode )
 import Agent.CLI.Runtime.Types ( DevResult(..) )
 import Agent.CLI.Session
     ( SessionHandle(..), SessionMeta(..) )
-import Agent.OsPath ( unsafeToFilePath )
+import Agent.OsPath ( unsafeEncodeUtf, unsafeToFilePath )
 import Data.Text ( Text )
 import System.IO ( IOMode(AppendMode), withFile )
-import System.OsPath ( (</>), unsafeEncodeUtf )
+import System.OsPath ( (</>) )
 import System.Posix.Files ( setFileMode )
 
 runInProcessSessionTurn

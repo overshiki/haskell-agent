@@ -34,7 +34,7 @@ import System.Directory
     , removeDirectoryRecursive
     )
 import System.FilePath ((</>))
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.Posix.Temp (mkdtemp)
 import Test.Hspec
 

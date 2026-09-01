@@ -47,7 +47,8 @@ import Data.Word (Word64)
 import qualified Data.Vector as Vector
 import Numeric (showHex)
 import System.Directory.OsPath (doesDirectoryExist, doesFileExist)
-import System.OsPath (OsPath, (</>), unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 
 loadTranscript :: OsPath -> ExceptT Text IO [SessionTurn]
 loadTranscript path = do

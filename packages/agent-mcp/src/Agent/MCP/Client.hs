@@ -80,6 +80,7 @@ import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import Data.Char (isAlphaNum, isAscii, ord)
+import Data.Foldable (foldl')
 import Data.IORef
     ( IORef
     , atomicModifyIORef'

@@ -23,6 +23,7 @@ import Claude.Agent.SDK.Types
     , messageUuid
     )
 import Control.Applicative ((<|>))
+import Data.Foldable (foldl')
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)

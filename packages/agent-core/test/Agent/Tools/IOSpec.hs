@@ -6,7 +6,8 @@ import Agent.FileRetry
     , retryOnFileBusy
     , writeLazyFileAtomically
     )
-import System.OsPath (equalFilePath, unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (equalFilePath)
 import Agent.Tools.IO
     ( CommandResult(..)
     , RunningCommand(..)

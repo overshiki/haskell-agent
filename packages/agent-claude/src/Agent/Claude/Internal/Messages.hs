@@ -60,6 +60,7 @@ import Claude.Agent.SDK.Types
 import qualified Data.Aeson.Encoding as Aeson
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
+import Data.Foldable (foldl')
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)

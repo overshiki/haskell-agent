@@ -27,7 +27,7 @@ import Data.Time.Clock
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory)
 import System.Posix.Files (ownerReadMode, ownerWriteMode, unionFileModes)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 
 data ModelsCacheKey = ModelsCacheKey
     { providerId :: !Text

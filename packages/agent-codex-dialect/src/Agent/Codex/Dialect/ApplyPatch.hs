@@ -10,7 +10,7 @@ module Agent.Codex.Dialect.ApplyPatch
     , applyPatchGrammar
     ) where
 
-import Agent.OsPath (fromText, relativeDisplayPath)
+import Agent.OsPath (fromText, relativeDisplayPath, unsafeEncodeUtf)
 import Agent.Tools.IO
     ( deleteTextFile
     , readTextFile
@@ -35,7 +35,7 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Directory.OsPath (doesFileExist)
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import System.OsPath (OsPath)
 
 
 -- | Lark grammar Codex registers for the freeform apply_patch tool.

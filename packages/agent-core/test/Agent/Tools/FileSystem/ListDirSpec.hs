@@ -1,6 +1,6 @@
 module Agent.Tools.FileSystem.ListDirSpec (spec) where
 
-import Agent.OsPath (fromText, toText)
+import Agent.OsPath (fromText, toText, unsafeEncodeUtf)
 import Agent.ToolDispatch
     ( ToolCallResult(..)
     , ToolDispatchConfig(..)
@@ -33,7 +33,6 @@ import System.Directory
     , setPermissions
     )
 import System.FilePath ((</>))
-import System.OsPath (unsafeEncodeUtf)
 import qualified System.OsPath as OsPath
 import System.Posix.Temp (mkdtemp)
 import Test.Hspec

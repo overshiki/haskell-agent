@@ -42,12 +42,12 @@ import System.Directory.OsPath
     , makeAbsolute
     , removeFile
     )
+import Agent.OsPath (unsafeEncodeUtf)
 import System.OsPath
     ( OsPath
     , isAbsolute
     , takeDirectory
     , takeFileName
-    , unsafeEncodeUtf
     , (</>)
     )
 import System.IO

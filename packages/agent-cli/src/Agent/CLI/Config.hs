@@ -35,7 +35,8 @@ import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Directory.OsPath (createDirectoryIfMissing, doesFileExist)
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.Posix.Files (setFileMode)
 
 harnessConfigSchemaVersion :: Int

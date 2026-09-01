@@ -32,6 +32,7 @@ import Control.Exception.Safe (tryAny)
 import Control.Monad (filterM)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
+import Data.Foldable (foldl')
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Directory (doesFileExist)

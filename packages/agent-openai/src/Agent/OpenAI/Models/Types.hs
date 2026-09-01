@@ -80,6 +80,7 @@ import Data.Aeson
     )
 import qualified Data.Aeson.Key as Key
 import Data.Aeson.Types (Pair)
+import Data.Foldable (foldl')
 import Data.List (find, sortOn)
 import Data.Maybe (fromMaybe)
 import Data.Scientific (Scientific)

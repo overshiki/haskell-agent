@@ -69,6 +69,7 @@ import Agent.TUI.Model
     )
 import Agent.TUI.Presentation (liveTodoPanelLines)
 import Data.IORef (IORef)
+import Data.Foldable (foldl')
 import Data.List (find, findIndex, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (listToMaybe)

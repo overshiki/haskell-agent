@@ -21,7 +21,7 @@ module Agent.Skills
 
 import Agent.Concurrent (mapConcurrentlyBounded)
 import Agent.FileRetry (retryOnFileBusy)
-import Agent.OsPath (directoryChain, toText, unsafeToFilePath)
+import Agent.OsPath (directoryChain, toText, unsafeEncodeUtf, unsafeToFilePath)
 import Control.Applicative ((<|>))
 import Control.Concurrent.STM
     ( atomically
@@ -39,7 +39,7 @@ import Data.Aeson
     , (.:?)
     , (.!=)
     )
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import System.OsPath (OsPath)
 import Data.Aeson.Types (Parser)
 import qualified Data.ByteString as BS
 import Data.Char (isAlphaNum)

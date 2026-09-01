@@ -57,7 +57,8 @@ import System.Directory.OsPath
     , doesFileExist
     )
 import System.Exit (ExitCode(..))
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.Posix.Files (setFileMode)
 import System.Process (CreateProcess(..), proc, readCreateProcessWithExitCode)
 

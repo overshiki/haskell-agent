@@ -39,7 +39,7 @@ import Data.IORef
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Timeout (timeout)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import Test.Hspec
 
 emptyTestTelemetry :: TurnTelemetry

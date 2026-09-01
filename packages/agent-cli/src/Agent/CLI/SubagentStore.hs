@@ -49,7 +49,8 @@ import System.Directory.OsPath
     ( createDirectoryIfMissing
     , doesFileExist
     )
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.Posix.Files (setFileMode)
 
 -- | Metadata shared by current and legacy subagent stores.

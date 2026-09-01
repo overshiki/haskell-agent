@@ -41,7 +41,7 @@ import Control.Exception.Safe (tryIO)
 import Control.Monad (unless, when)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Char (isAlpha, isAlphaNum, isSpace)
-import Data.Foldable (traverse_)
+import Data.Foldable (foldl', traverse_)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict (Map)
 import Data.Maybe (fromMaybe)
@@ -52,7 +52,8 @@ import qualified System.Directory as Directory
 import System.Directory.OsPath (doesFileExist)
 import qualified System.Environment as Environment
 import qualified System.FilePath as FilePath
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 
 data ResponsesConnection = ResponsesConnection
     { responsesBaseUrl :: !Text

@@ -1,6 +1,6 @@
 module Agent.SkillsSpec (spec) where
 
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import Agent.Skills
 import Control.Exception.Safe (bracket, finally)
 import qualified Data.Text as Text

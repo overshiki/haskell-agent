@@ -137,7 +137,8 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock (getCurrentTime)
 import System.Directory.OsPath (doesFileExist, getHomeDirectory)
-import System.OsPath (unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath ((</>))
 
 loadAuth :: Maybe Provider -> IO (Either Text LoadedAuth)
 loadAuth (Just OpenAIProvider) = loadOpenAiWithGateway

@@ -42,7 +42,8 @@ import System.Directory.OsPath
     , doesFileExist
     , getHomeDirectory
     )
-import System.OsPath (OsPath, takeDirectory, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, takeDirectory, (</>))
 import System.Posix.Files (setFileMode)
 import System.IO.Unsafe (unsafePerformIO)
 

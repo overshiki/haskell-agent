@@ -21,7 +21,8 @@ import qualified Data.Text as Text
 import Numeric (showHex)
 import System.Directory.OsPath (createDirectoryIfMissing, doesFileExist, getHomeDirectory)
 import System.IO.Unsafe (unsafePerformIO)
-import System.OsPath (OsPath, takeDirectory, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, takeDirectory, (</>))
 import System.Posix.Files (setFileMode)
 
 mcpOAuthStorePath :: OsPath -> Text -> OsPath

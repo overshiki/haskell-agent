@@ -145,7 +145,7 @@ import Control.Exception.Safe (finally, mask, onException, throwIO, tryAny)
 import Control.Exception (AsyncException(UserInterrupt))
 import Data.Char (isControl, isSpace)
 import qualified Data.ByteString as BS
-import Data.Foldable (toList)
+import Data.Foldable (foldl', toList)
 import Data.IORef ( atomicModifyIORef' , modifyIORef' , newIORef , readIORef , writeIORef )
 import Data.List ( find , findIndex , intersperse , nub , sort , sortOn )
 import Data.List.NonEmpty (NonEmpty(..))

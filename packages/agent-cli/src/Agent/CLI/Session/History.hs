@@ -59,6 +59,7 @@ import Control.Exception.Safe
     , try
     )
 import Control.Monad (void)
+import Data.Foldable (foldl')
 import Data.IORef
     ( IORef
     , readIORef

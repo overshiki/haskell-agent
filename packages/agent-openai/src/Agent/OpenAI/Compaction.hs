@@ -58,6 +58,7 @@ import Agent.OpenAI.Compaction.Commands
 import Agent.Responses.Types
 import Agent.Json (RawJson, rawJsonFromEncoding)
 import qualified Data.Aeson as Aeson
+import Data.Foldable (foldl')
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

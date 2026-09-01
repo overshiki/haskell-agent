@@ -6,7 +6,7 @@ module Agent.FileRetry
     , writeLazyFileAtomically
     ) where
 
-import Agent.OsPath (unsafeToFilePath)
+import Agent.OsPath (fromText, unsafeToFilePath)
 import Control.Exception.Safe (bracket, bracketOnError, throwIO, tryIO)
 import Control.Retry
     ( RetryPolicyM
@@ -15,6 +15,7 @@ import Control.Retry
     , retrying
     )
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Text as Text
 import System.Directory.OsPath (removeFile, renameFile)
 import System.IO
     ( IOMode(AppendMode)
@@ -23,7 +24,7 @@ import System.IO
     , openBinaryTempFile
     )
 import System.IO.Error (isAlreadyInUseError)
-import System.OsPath (OsPath, takeDirectory, takeFileName, unsafeEncodeUtf)
+import System.OsPath (OsPath, takeDirectory, takeFileName)
 import System.Posix.Files (setFileMode)
 import System.Posix.Types (FileMode)
 
@@ -62,7 +63,7 @@ writeLazyFileAtomically path mode bytes =
         LBS.hPut handle bytes
         hClose handle
         setFileMode temporary mode
-        retryOnFileBusy (renameFile (unsafeEncodeUtf temporary) path)
+        retryOnFileBusy (renameFile (fromText (Text.pack temporary)) path)
   where
     acquire =
         retryOnFileBusy $
@@ -71,5 +72,5 @@ writeLazyFileAtomically path mode bytes =
                 (unsafeToFilePath (takeFileName path) <> ".tmp")
     cleanup (temporary, handle) = do
         _ <- tryIO (hClose handle)
-        _ <- tryIO (removeFile (unsafeEncodeUtf temporary))
+        _ <- tryIO (removeFile (fromText (Text.pack temporary)))
         pure ()

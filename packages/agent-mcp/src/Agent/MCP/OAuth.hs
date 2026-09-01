@@ -68,13 +68,14 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.Encoding.Error as EncodingError
+import Data.Foldable (foldl')
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Network.HTTP.Client (Manager, RequestBody(..), httpLbs, parseRequest, responseBody, responseStatus, urlEncodedBody)
 import qualified Network.HTTP.Client as HC
 import Network.HTTP.Types (statusCode)
 import qualified System.FileLock as FileLock
+import Agent.OsPath (unsafeEncodeUtf)
 import System.IO.Unsafe (unsafePerformIO)
-import System.OsPath (unsafeEncodeUtf)
 import System.Posix.Files (ownerReadMode, ownerWriteMode)
 import System.Posix.IO (OpenFileFlags(..), OpenMode(ReadWrite), closeFd, defaultFileFlags, openFd)
 

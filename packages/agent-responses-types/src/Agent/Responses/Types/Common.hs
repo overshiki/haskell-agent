@@ -15,6 +15,7 @@ module Agent.Responses.Types.Common
     ) where
 
 import Control.Monad (join)
+import Data.Foldable (foldl')
 import Agent.Json (RawJson, rawJsonDecoder)
 import Data.Aeson hiding (TaggedObject)
 import qualified Data.Aeson as Aeson

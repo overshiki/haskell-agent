@@ -111,7 +111,8 @@ import System.Exit (ExitCode(..))
 import System.FilePath (takeFileName)
 import qualified System.FilePath as FilePath
 import System.IO (IOMode(AppendMode), hClose, openTempFile, withFile)
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.Posix.Files (setFileMode)
 import System.Process
     ( CreateProcess(..)

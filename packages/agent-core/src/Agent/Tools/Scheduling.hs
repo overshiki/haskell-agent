@@ -7,14 +7,16 @@ module Agent.Tools.Scheduling
     ) where
 
 import Data.Text (Text)
+import qualified Data.Text as Text
 import System.OsPath
     ( OsPath
     , equalFilePath
     , isAbsolute
     , makeRelative
     , splitDirectories
-    , unsafeEncodeUtf
     )
+
+import Agent.OsPath (fromText)
 
 data ToolAccess
     = ToolRead
@@ -84,5 +86,5 @@ pathInside root path
         let relative = makeRelative root path
         in not (isAbsolute relative)
             && case splitDirectories relative of
-                first : _ -> first /= unsafeEncodeUtf ".."
+                first : _ -> first /= fromText (Text.pack "..")
                 [] -> True

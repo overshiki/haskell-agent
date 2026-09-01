@@ -1,7 +1,7 @@
 module Agent.Tools.GhciSpec (spec) where
 
 import Agent.Cancel (requestCancel, resetCancel)
-import System.OsPath (decodeUtf, unsafeEncodeUtf)
+import Agent.OsPath (decodeUtf, unsafeEncodeUtf)
 import Agent.ToolDispatch (functionToolCall)
 import Agent.Tools.FileSystem.Grep (grepTool)
 import Agent.Tools.Scheduling (schedulingPlansConflict)

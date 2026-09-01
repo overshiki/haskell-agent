@@ -13,7 +13,7 @@ module Agent.Tools.FileSystem
 
 import Agent.FileRetry (retryOnFileBusy)
 import Agent.Concurrent (mapConcurrentlyBounded)
-import Agent.OsPath (relativeDisplayPath, toText, unsafeToFilePath)
+import Agent.OsPath (relativeDisplayPath, toText, unsafeEncodeUtf, unsafeToFilePath)
 import Agent.Tools.Types (ToolEnv(..), addToolAllowedRoot)
 import Control.Exception.Safe (SomeException, try, tryAny, tryIO)
 import Data.List (find)
@@ -43,7 +43,6 @@ import System.OsPath
     , splitDirectories
     , takeDirectory
     , takeFileName
-    , unsafeEncodeUtf
     , (</>)
     )
 import System.IO.Error (isDoesNotExistError)

@@ -16,6 +16,7 @@ import Control.Applicative ((<|>))
 import Data.Aeson (Value(..), encode)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy as LBS
+import Data.Foldable (foldl')
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set

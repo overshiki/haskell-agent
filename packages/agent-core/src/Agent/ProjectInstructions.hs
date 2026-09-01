@@ -19,7 +19,7 @@ module Agent.ProjectInstructions
 
 import Agent.Concurrent (mapConcurrentlyBounded)
 import Agent.FileRetry (retryOnFileBusy)
-import Agent.OsPath (directoryChain, toText, unsafeToFilePath)
+import Agent.OsPath (directoryChain, toText, unsafeEncodeUtf, unsafeToFilePath)
 import Control.Concurrent.Async (concurrently)
 import Control.Exception.Safe (SomeException, displayException, tryAny)
 import qualified Data.ByteString as BS
@@ -42,7 +42,6 @@ import System.OsPath
     , takeDirectory
     , takeExtension
     , takeFileName
-    , unsafeEncodeUtf
     , (</>)
     )
 

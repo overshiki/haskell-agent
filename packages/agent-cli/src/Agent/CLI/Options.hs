@@ -21,7 +21,8 @@ module Agent.CLI.Options
     , usage
     ) where
 
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath)
 import Agent.Dialect (DialectId(..))
 import Agent.Loop (defaultLoopMaxTurns)
 import Agent.Provider (Provider(..), parseProvider)

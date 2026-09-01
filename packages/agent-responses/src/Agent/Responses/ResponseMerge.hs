@@ -11,6 +11,7 @@ module Agent.Responses.ResponseMerge
 
 import Agent.Responses.Types
 import Control.Applicative ((<|>))
+import Data.Foldable (foldl')
 import Data.List (find)
 import qualified Data.Set as Set
 import Data.Text (Text)

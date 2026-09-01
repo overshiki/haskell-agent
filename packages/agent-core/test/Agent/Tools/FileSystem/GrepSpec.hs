@@ -32,7 +32,7 @@ import System.Directory
     )
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath (searchPathSeparator, (</>))
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.Posix.Temp (mkdtemp)
 import System.Timeout (timeout)
 import Test.Hspec

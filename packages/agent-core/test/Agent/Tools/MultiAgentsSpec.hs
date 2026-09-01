@@ -7,7 +7,7 @@ import Agent.Loop
     , defaultLoopDispatch
     , emptyTokenUsage
     )
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import Agent.Subagents
 import Agent.Subagents.TaskPath (joinTaskPath, taskPathRoot, taskPathText)
 import Agent.ToolDispatch

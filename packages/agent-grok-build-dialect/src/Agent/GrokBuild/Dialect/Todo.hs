@@ -20,6 +20,7 @@ import Agent.Tools.Types
     , withToolResourceClaims
     )
 import Control.Monad (foldM)
+import Data.Foldable (foldl')
 import Data.IORef (atomicModifyIORef')
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map

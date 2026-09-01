@@ -1,6 +1,7 @@
 module Agent.TextBufferSpec (spec) where
 
 import Agent.TextBuffer
+import Data.Foldable (foldl')
 import qualified Data.Text as Text
 import Test.Hspec
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)

@@ -19,7 +19,7 @@ module Agent.Tools.Dangerous
     ) where
 
 import Agent.JsonText (jsonTextField)
-import Agent.OsPath (fromText, toText, unsafeToFilePath)
+import Agent.OsPath (fromText, toText, unsafeEncodeUtf, unsafeToFilePath)
 import Agent.Tools.FileSystem (pathTargetsSystemTemp)
 import Data.Char
     ( chr
@@ -39,7 +39,7 @@ import System.FilePath
     , splitDirectories
     , (</>)
     )
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import System.OsPath (OsPath)
 
 -- | If @toolName@ is a shell tool and @argumentsJson@ contains a forbidden
 -- command, return a rejection message for the model. Otherwise 'Nothing'.

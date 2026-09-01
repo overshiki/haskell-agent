@@ -58,7 +58,8 @@ import qualified Data.Text.Encoding as TextEncoding
 import qualified Data.Text.Lazy as LazyText
 import Data.Time.Clock (UTCTime, addUTCTime, getCurrentTime)
 import System.Directory.OsPath (doesFileExist, getHomeDirectory)
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 
 data ExternalGrokSource
     = GrokSourceEnvironment

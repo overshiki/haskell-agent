@@ -23,7 +23,7 @@ import System.Directory (createDirectoryIfMissing, getHomeDirectory)
 import System.FilePath (takeDirectory, (</>))
 import System.Posix.Files (setFileMode)
 import System.Posix.Types (FileMode)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 
 replHistoryPath :: FilePath -> FilePath
 replHistoryPath home = home </> ".haskell-agent" </> "history"

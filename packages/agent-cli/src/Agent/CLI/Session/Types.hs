@@ -60,7 +60,8 @@ import Data.Int (Int64)
 import Data.IORef (IORef)
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock (UTCTime)
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath)
 
 data SessionMeta = SessionMeta
     { metaVersion :: !Int

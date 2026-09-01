@@ -3,7 +3,7 @@ module Agent.SubagentsSpec (spec) where
 import Agent.Cancel (isCancelled, waitCancel)
 import Agent.InterAgentMessage
 import Agent.Loop (LoopError(..), LoopResult(..), emptyTokenUsage)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import Agent.Subagents
 import Agent.Subagents.TaskPath
     ( TaskPath

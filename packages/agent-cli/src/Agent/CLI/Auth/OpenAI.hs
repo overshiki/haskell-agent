@@ -69,7 +69,8 @@ import System.Directory.OsPath
     ( doesFileExist
     , getHomeDirectory
     )
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 
 data OpenAiApiKeySource = OpenAiApiKeySource
     { apiKeyAccessToken :: !Text

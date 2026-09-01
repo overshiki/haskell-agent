@@ -56,10 +56,10 @@ import System.Directory.OsPath
     )
 import System.Exit (die)
 import System.IO (stderr)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.OsPath
     ( OsPath
     , decodeFS
-    , unsafeEncodeUtf
     , (</>)
     )
 

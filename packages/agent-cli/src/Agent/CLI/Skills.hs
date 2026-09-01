@@ -40,7 +40,8 @@ import qualified System.Directory as Directory
 import qualified System.Environment as Environment
 import qualified System.FilePath as FilePath
 import System.IO (stderr)
-import System.OsPath (OsPath, unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath)
 
 reservedSlashNames :: [Text]
 reservedSlashNames =

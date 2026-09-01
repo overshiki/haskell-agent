@@ -33,9 +33,9 @@ import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock (getCurrentTime)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.OsPath
     ( OsPath
-    , unsafeEncodeUtf
     , (</>)
     )
 

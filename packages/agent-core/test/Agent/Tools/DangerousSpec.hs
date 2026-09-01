@@ -14,7 +14,7 @@ import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding
 import Control.Exception.Safe (tryAny)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.Posix.Files (deviceID, fileID, getFileStatus)
 import Test.Hspec
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)

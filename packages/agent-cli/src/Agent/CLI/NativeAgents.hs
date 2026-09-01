@@ -34,7 +34,7 @@ import Agent.TUI.Model
     , initialUiState
     , reduceUi
     )
-import Data.Foldable (toList)
+import Data.Foldable (foldl', toList)
 import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)

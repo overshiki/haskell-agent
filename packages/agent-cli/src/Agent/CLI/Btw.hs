@@ -29,6 +29,7 @@ import Agent.Responses.Types
     , ToolChoiceMode(..)
     )
 import Control.Concurrent.Async (race)
+import Data.Foldable (foldl')
 import Data.IORef (IORef, readIORef)
 import Data.List (findIndex)
 import Data.Set (Set)

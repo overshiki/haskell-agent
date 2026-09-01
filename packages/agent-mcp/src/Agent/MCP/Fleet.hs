@@ -66,6 +66,7 @@ import Data.Aeson
     )
 import qualified Data.Aeson as Aeson
 import Data.Char (isAlphaNum)
+import Data.Foldable (foldl')
 import Data.IORef
     ( atomicModifyIORef'
     , newIORef

@@ -117,6 +117,7 @@ library
                     , directory
                     , filepath
                     , JuicyPixels
+                    , mtl
                     , process
                     , retry >= 0.9.3.1 && < 0.10
                     , resourcet

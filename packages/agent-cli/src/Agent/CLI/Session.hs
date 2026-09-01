@@ -156,6 +156,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Char (isHexDigit)
 import Data.Int (Int64)
 import Data.IORef
+import Data.Foldable (foldl')
 import Data.Functor ((<&>))
 import Data.List (sortOn)
 import Data.Maybe (fromMaybe)
@@ -184,13 +185,13 @@ import System.Directory.OsPath
     , removeFile
     )
 import qualified System.FileLock as FileLock
+import Agent.OsPath (unsafeEncodeUtf)
 import System.OsPath
     ( OsPath
     , equalFilePath
     , normalise
     , takeDirectory
     , takeFileName
-    , unsafeEncodeUtf
     , (</>)
     )
 import System.IO.Error (isDoesNotExistError)

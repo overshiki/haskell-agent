@@ -6,7 +6,7 @@ module Agent.CLI.Environment
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified System.Process.Environment.OsString as Environment
-import qualified System.OsPath as OsPath
+import qualified Agent.OsPath as OsPath
 
 -- | Read a non-empty environment variable using the platform environment
 -- representation, decoding its value as UTF-8.

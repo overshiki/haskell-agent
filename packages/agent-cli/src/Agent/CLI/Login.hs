@@ -166,7 +166,8 @@ import Data.Time.Clock
     )
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import System.Directory.OsPath (doesFileExist, getHomeDirectory)
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.IO
     ( hFlush
     , hGetEcho

@@ -34,7 +34,7 @@ module Agent.Tools.PlanMode
 import Agent.FileRetry (retryOnFileBusy)
 import Agent.Json.Decode (Decoder)
 import qualified Agent.Json.Decode as Json
-import Agent.OsPath (toText, unsafeToFilePath)
+import Agent.OsPath (toText, unsafeEncodeUtf, unsafeToFilePath)
 import Agent.ToolArgs (objectArgs, optBool, optList, optText, reqText)
 import Agent.ToolDSL
     ( PropertySchema(..)
@@ -58,7 +58,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import System.Directory.OsPath (createDirectoryIfMissing, doesFileExist)
-import System.OsPath (OsPath, equalFilePath, takeDirectory, unsafeEncodeUtf, (</>))
+import System.OsPath (OsPath, equalFilePath, takeDirectory, (</>))
 
 data PlanModeState
     = PlanInactive

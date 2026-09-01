@@ -55,7 +55,7 @@ import Agent.TUI.Model
     , initialUiState
     , reduceUi
     )
-import Data.Foldable (toList)
+import Data.Foldable (foldl', toList)
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TextEncoding

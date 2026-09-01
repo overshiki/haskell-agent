@@ -17,7 +17,7 @@ module Agent.GrokBuild.Dialect.Shell
     , hasUnwaitedBackgroundOp
     ) where
 
-import Agent.OsPath (fromText, unsafeToFilePath)
+import Agent.OsPath (fromText, unsafeEncodeUtf, unsafeToFilePath)
 import Agent.ResourceScope
     ( ResourceKey
     , ResourceScope
@@ -57,7 +57,7 @@ import System.Directory.OsPath
     )
 import System.IO (hClose)
 import System.IO.Temp (getCanonicalTemporaryDirectory, openTempFile)
-import System.OsPath (OsPath, unsafeEncodeUtf, (<.>))
+import System.OsPath (OsPath, (<.>))
 import System.Posix.Files (ownerReadMode, ownerWriteMode, setFileMode, unionFileModes)
 
 data PersistentShell = PersistentShell

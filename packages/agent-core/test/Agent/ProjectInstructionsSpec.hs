@@ -1,7 +1,7 @@
 module Agent.ProjectInstructionsSpec (spec) where
 
 import Agent.ProjectInstructions
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception.Safe (bracket, finally)
 import System.Directory

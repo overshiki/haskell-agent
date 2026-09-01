@@ -1,6 +1,6 @@
 module Agent.Tools.PlanModeSpec (spec) where
 
-import Agent.OsPath (toText)
+import Agent.OsPath (toText, unsafeEncodeUtf)
 import Agent.ToolDispatch
     ( ToolCallResult(..)
     , ToolDispatchConfig(..)
@@ -22,7 +22,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import System.Directory (getTemporaryDirectory, removeDirectoryRecursive)
 import System.FilePath ((</>))
-import System.OsPath (unsafeEncodeUtf)
 import System.Posix.Temp (mkdtemp)
 import Test.Hspec
 

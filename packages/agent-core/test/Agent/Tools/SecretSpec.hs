@@ -32,7 +32,7 @@ import System.Directory
     , removeDirectoryRecursive
     )
 import System.FilePath (takeDirectory, (</>))
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.Posix.Files (fileMode, getFileStatus)
 import System.Posix.Temp (mkdtemp)
 import Test.Hspec

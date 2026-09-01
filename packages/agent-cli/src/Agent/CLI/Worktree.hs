@@ -64,6 +64,7 @@ import System.Directory.OsPath
 import System.Entropy (getEntropy)
 import System.Exit (ExitCode(..))
 import qualified System.FileLock as FileLock
+import Agent.OsPath (unsafeEncodeUtf)
 import System.OsPath
     ( OsPath
     , equalFilePath
@@ -71,7 +72,6 @@ import System.OsPath
     , splitDirectories
     , takeDirectory
     , takeFileName
-    , unsafeEncodeUtf
     , (</>)
     )
 import System.Process (CreateProcess(..), proc, readCreateProcessWithExitCode)

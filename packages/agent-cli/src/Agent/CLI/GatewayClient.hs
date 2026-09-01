@@ -86,7 +86,8 @@ import Network.Socket.ByteString qualified as Socket
 import System.Directory.OsPath qualified as Directory
 import System.Entropy (getEntropy)
 import System.Exit (ExitCode (..))
-import System.OsPath (OsPath, takeDirectory, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, takeDirectory, (</>))
 import System.Posix.Files (setFileMode)
 import System.Process (rawSystem)
 import System.Timeout (timeout)

@@ -1,3 +1,6 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Agent.Loop.Internal where
 
 import Agent.Cancel (CancelFlag, isCancelled, waitCancel)
@@ -44,10 +47,18 @@ import Control.Exception.Safe
     , mask
     , tryAny
     )
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader
+    ( MonadReader
+    , ReaderT
+    , ask
+    , asks
+    , runReaderT
+    )
 import Data.Aeson (ToJSON(..), object, (.=))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
-import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import qualified Data.IntMap.Strict as IntMap
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntSet as IntSet
@@ -421,6 +432,64 @@ data LoopConfig = LoopConfig
     , loopCancel :: !CancelFlag
     }
 
+-- | Mutable session state. Kept in an IORef so writes survive async exceptions.
+data LoopState = LoopState
+    { loopProgress :: !(BackendSnapshot, LoopProgress)
+    , loopPendingInputs :: ![TurnInput]
+    }
+
+-- | Resources constant for one loop invocation.
+data LoopContext = LoopContext
+    { ctxConfig :: !LoopConfig
+    , ctxStateRef :: !(IORef LoopState)
+    , ctxUncommittedTextRef :: !(IORef ([[Text]], [Text]))
+    , ctxProviderTelemetryRef :: !(IORef [TurnTelemetry])
+    , ctxEventPump :: !LoopEventPump
+    }
+
+-- | Monad for synchronous loop logic. ReaderT gives config/resources; effects
+-- remain explicit through liftIO.
+newtype LoopM a = LoopM (ReaderT LoopContext IO a)
+    deriving newtype
+        ( Functor
+        , Applicative
+        , Monad
+        , MonadIO
+        , MonadReader LoopContext
+        )
+
+runLoopMInIO :: LoopContext -> LoopM a -> IO a
+runLoopMInIO ctx (LoopM m) = runReaderT m ctx
+
+getLoopState :: LoopM LoopState
+getLoopState = asks (.ctxStateRef) >>= liftIO . readIORef
+
+putLoopState :: LoopState -> LoopM ()
+putLoopState state = asks (.ctxStateRef) >>= liftIO . flip writeIORef state
+
+modifyLoopState :: (LoopState -> LoopState) -> LoopM ()
+modifyLoopState f = asks (.ctxStateRef) >>= liftIO . flip modifyIORef' f
+
+isCancelledLoop :: LoopM Bool
+isCancelledLoop = do
+    cancelFlag <- asks (.ctxConfig.loopCancel)
+    liftIO $ isCancelled cancelFlag
+
+readUncommittedText :: LoopM ([[Text]], [Text])
+readUncommittedText = asks (.ctxUncommittedTextRef) >>= liftIO . readIORef
+
+modifyUncommittedText :: (([[Text]], [Text]) -> ([[Text]], [Text])) -> LoopM ()
+modifyUncommittedText f = asks (.ctxUncommittedTextRef) >>= liftIO . flip modifyIORef' f
+
+appendProviderTelemetry :: TurnTelemetry -> LoopM ()
+appendProviderTelemetry telemetry =
+    asks (.ctxProviderTelemetryRef) >>= liftIO . flip modifyIORef' (telemetry :)
+
+runToolCallsM :: [ToolCall] -> LoopM [ToolCallResult]
+runToolCallsM calls = do
+    config <- asks (.ctxConfig)
+    liftIO $ runToolCalls config calls
+
 data LoopResult = LoopResult
     { finalResponseId :: !Text
     , finalText :: !(Maybe Text)
@@ -550,6 +619,22 @@ exceptionSummary =
         . Text.pack
         . displayException
 
+-- | Record assistant text deltas so that uncommitted text remains visible
+-- across restarts and discarded attempts.
+recordVisibleLoopEvent :: IORef ([[Text]], [Text]) -> LoopEvent -> IO ()
+recordVisibleLoopEvent ref = \case
+    TextDelta delta ->
+        modifyIORef' ref \(finished, current) -> (finished, delta : current)
+    ResponseRestarted _ ->
+        modifyIORef' ref \(finished, current) -> finishCurrent finished current
+    ResponseAttemptDiscarded ->
+        modifyIORef' ref \(finished, _) -> (finished, [])
+    _ -> pure ()
+  where
+    finishCurrent finished current
+        | null current = (finished, [])
+        | otherwise = (current : finished, [])
+
 runLoopInputsUnsafe
     :: LoopConfig
     -> BackendSnapshot
@@ -558,271 +643,291 @@ runLoopInputsUnsafe
     -> IO LoopExecution
 runLoopInputsUnsafe config0 initialState previousResponseId firstInputs = do
     eventPump <- newEventPump config0.loopOnEvent
-    progressRef <- newIORef (initialState, NoResponseCommitted)
+    stateRef <- newIORef LoopState
+        { loopProgress = (initialState, NoResponseCommitted)
+        , loopPendingInputs = []
+        }
     uncommittedTextRef <- newIORef ([], [])
     providerTelemetryRef <- newIORef []
     initialSteering <- config0.loopReadSteering
-    pendingRef <- newIORef (firstInputs <> initialSteering)
-    withAsync (runEventPump eventPump) \eventWorker -> do
-        let recordVisible event =
-                modifyIORef' uncommittedTextRef \(finished, current) ->
-                    case event of
-                        TextDelta delta -> (finished, delta : current)
-                        -- A restarted attempt stays visible, marked failed,
-                        -- until a later response commits or the turn ends.
-                        ResponseRestarted _ -> finishCurrent finished current
-                        ResponseAttemptDiscarded -> (finished, [])
-                        _ -> (finished, current)
-            finishCurrent finished current
-                | null current = (finished, [])
-                | otherwise = (current : finished, [])
-            config = config0
+
+    let ctx = LoopContext
+            { ctxConfig = config0
                 { loopOnEvent = \event -> do
-                    recordVisible event
+                    recordVisibleLoopEvent uncommittedTextRef event
                     emitLoopEvent eventPump event
                 }
-            finish
-                :: BackendSnapshot
-                -> LoopProgress
-                -> Either LoopError LoopResult
-                -> IO LoopExecution
-            finish state progress result = do
-                writeIORef progressRef (state, progress)
-                pending <- readIORef pendingRef
-                (finishedChunks, currentChunks) <- readIORef uncommittedTextRef
-                providerTelemetry <-
-                    reverse <$> readIORef providerTelemetryRef
-                let uncommittedText = Text.intercalate "\n\n" $
-                        filter (not . Text.null) $
-                            map (Text.concat . reverse)
-                                (reverse finishedChunks <> [currentChunks])
-                pure LoopExecution
-                    { executionState = state.backendItems
-                    , executionPendingInputs = pending
-                    , executionProgress = progress
-                    , executionUncommittedAssistantText =
-                        if Text.null uncommittedText
-                            then Nothing
-                            else Just uncommittedText
-                    , executionProviderTelemetry = providerTelemetry
-                    , executionResult = result
-                    }
-            finishCursor
-                :: LoopCursor
-                -> Either LoopError LoopResult
-                -> IO LoopExecution
-            finishCursor cursor =
-                finish cursor.cursorState cursor.cursorProgress
-            unexpected
-                :: BackendSnapshot
-                -> LoopProgress
-                -> SomeException
-                -> IO LoopExecution
-            unexpected state progress exception =
-                finish state progress
-                    (Left (LoopUnexpected (exceptionSummary exception)))
-            unexpectedCursor
-                :: LoopCursor
-                -> SomeException
-                -> IO LoopExecution
-            unexpectedCursor cursor =
-                unexpected cursor.cursorState cursor.cursorProgress
-            protect :: LoopCursor -> IO LoopExecution -> IO LoopExecution
-            protect cursor action =
-                tryAny action >>= either (unexpectedCursor cursor) pure
-            go :: LoopCursor -> IO LoopExecution
-            go cursor = do
-                writeIORef progressRef
-                    (cursor.cursorState, cursor.cursorProgress)
-                writeIORef pendingRef cursor.cursorInputs
-                if cursor.cursorTurnsUsed >= config.loopMaxTurns
-                    then finishCursor cursor $ case cursor.cursorLastOutput of
-                        Just turn -> Left (LoopMaxTurns turn)
-                        Nothing -> Left LoopNoResponseId
-                    else protect cursor do
-                        cancelled <- isCancelled config.loopCancel
-                        if cancelled
-                            then finishCursor cursor (Left (LoopCancelled []))
-                            else do
-                                config.loopOnEvent TurnStarted
-                                outputSeen <- newIORef False
-                                let onBackendEvent event = do
-                                        case event of
-                                            TextDelta _ -> writeIORef outputSeen True
-                                            ReasoningDelta _ -> writeIORef outputSeen True
-                                            -- The backend rolled that attempt back,
-                                            -- so a later failure no longer interrupts
-                                            -- visible output.
-                                            ResponseAttemptDiscarded ->
-                                                writeIORef outputSeen False
-                                            _ -> pure ()
-                                        config.loopOnEvent event
-                                -- Race the model call against cancel so Ctrl-C / Esc
-                                -- can stop reasoning mid-stream, not only between tools.
-                                raced <- mask \restore ->
-                                  withAsync
-                                    (restore $
-                                        config.loopBackend.submitTurn
-                                            cursor.cursorState
-                                            cursor.cursorPreviousResponseId
-                                            cursor.cursorInputs
-                                            onBackendEvent)
-                                    \submission -> do
-                                    result <- restore $ race
-                                        (waitCancel config.loopCancel)
-                                        (waitCatch submission)
-                                    normalized <- case result of
-                                        Left () -> do
-                                            -- Give structured providers a
-                                            -- chance to preserve their
-                                            -- subprocess/session invariants
-                                            -- before withAsync force-cancels
-                                            -- an unresponsive submission.
-                                            _ <- restore $
-                                                timeout 2000000
-                                                    (tryAny
-                                                        config.loopInterrupt)
-                                            _ <- restore $
-                                                timeout 2000000
-                                                    (waitCatch submission)
-                                            pure (Left ())
-                                        Right (Left exception) ->
-                                            -- Preserve the provider thread's
-                                            -- asynchronous-exception identity.
-                                            -- Safe.throwIO deliberately marks
-                                            -- manually thrown exceptions as
-                                            -- synchronous, which would turn a
-                                            -- ThreadKilled into LoopUnexpected.
-                                            Exception.throwIO exception
-                                        Right (Right completed) ->
-                                            pure (Right completed)
-                                    case normalized of
-                                        Right (Right backendResult@BackendResult{..})
-                                            | not
-                                                (Text.null
-                                                    backendOutput.responseId) -> do
-                                                committed <-
-                                                    config.loopBackendState.commitBackendState
-                                                        backendState
-                                                writeIORef progressRef
-                                                    (committed, ResponseCommitted)
-                                                pure
-                                                    (Right
-                                                        (Right backendResult
-                                                            { backendState =
-                                                                committed
-                                                            }))
-                                        _ -> pure normalized
-                                case raced of
-                                    Left () ->
-                                        finishCursor cursor
-                                            (Left (LoopCancelled []))
-                                    Right (Left err) -> do
-                                        emitted <- readIORef outputSeen
-                                        finishCursor cursor $ Left $
-                                            if emitted
-                                                then LoopTransportAfterOutput err
-                                                else LoopTransport err
-                                    Right (Right BackendResult{backendOutput = turn})
-                                        | Text.null turn.responseId ->
-                                            finishCursor cursor
-                                                (Left LoopNoResponseId)
-                                    Right (Right BackendResult{..}) -> do
-                                        continueCommitted
-                                            cursor
-                                                { cursorState = backendState
-                                                , cursorProgress =
-                                                    ResponseCommitted
-                                                }
-                                            backendOutput
-            continueCommitted
-                :: LoopCursor
-                -> TurnOutput
-                -> IO LoopExecution
-            continueCommitted cursor turn = do
-                writeIORef progressRef
-                    (cursor.cursorState, ResponseCommitted)
-                -- The committed response absorbed every input submitted with
-                -- it, and its assistant text now lives in the committed state.
-                writeIORef pendingRef []
-                writeIORef uncommittedTextRef ([], [])
-                -- Result metadata belongs to the response commit even when a
-                -- cancellation lands before the completion event is painted.
-                case turn.providerTelemetry of
-                    Nothing -> pure ()
-                    Just telemetry ->
-                        modifyIORef' providerTelemetryRef (telemetry :)
-                protect cursor do
-                    -- A cancel that landed during submitTurn after the race chose
-                    -- Right still counts, but its returned state is committed.
-                    cancelledMid <- isCancelled config.loopCancel
-                    if cancelledMid
-                        then finishCursor cursor
-                            (Left (LoopCancelled []))
-                        else do
-                            config.loopOnEvent (TurnFinished turn)
-                            case turn.completion of
-                                TurnIncomplete{} ->
-                                    finishCursor cursor
-                                        (Left (LoopIncomplete turn))
-                                TurnCompleted -> do
-                                    config.loopCommitSteering
-                                        cursor.cursorSteeringCount
-                                    results <-
-                                        if null turn.toolCalls
-                                            then pure []
-                                            else runToolCalls config turn.toolCalls
-                                    writeIORef pendingRef (map CompletedTool results)
-                                    cancelledAfter <-
-                                        isCancelled config.loopCancel
-                                    if cancelledAfter
-                                        then finishCursor cursor
-                                            (Left (LoopCancelled results))
-                                        else do
-                                            steering <- config.loopReadSteering
-                                            let continuation =
-                                                    map CompletedTool results
-                                                        <> steering
-                                            case decideCompletedTurn
-                                                cursor
-                                                turn
-                                                continuation
-                                                (length steering) of
-                                                ContinueLoop nextCursor ->
-                                                    go nextCursor
-                                                FinishLoop result ->
-                                                    finishCursor cursor
-                                                        (Right result)
-                                                WarnAndFinishLoop result -> do
-                                                    config.loopOnEvent
-                                                        (WarningRaised
-                                                            emptyContinuationWarning)
-                                                    finishCursor cursor
-                                                        (Right result)
-            run :: IO LoopExecution
-            run =
-                go LoopCursor
-                    { cursorState = initialState
-                    , cursorProgress = NoResponseCommitted
-                    , cursorPreviousResponseId = previousResponseId
-                    , cursorTurnsUsed = 0
-                    , cursorInputs = firstInputs <> initialSteering
-                    , cursorSteeringCount = length initialSteering
-                    , cursorLastOutput = Nothing
-                    , cursorTokenUsage = emptyTokenUsage
-                    , cursorEmptyContinuations = 0
-                    }
-        raced <- race (waitEventPumpFailure eventWorker eventPump) run
+            , ctxStateRef = stateRef
+            , ctxUncommittedTextRef = uncommittedTextRef
+            , ctxProviderTelemetryRef = providerTelemetryRef
+            , ctxEventPump = eventPump
+            }
+
+    writeIORef stateRef LoopState
+        { loopProgress = (initialState, NoResponseCommitted)
+        , loopPendingInputs = firstInputs <> initialSteering
+        }
+
+    withAsync (runEventPump eventPump) \eventWorker -> do
+        raced <- race
+            (waitEventPumpFailure eventWorker eventPump)
+            (runLoopMInIO ctx $ runLoopBody previousResponseId firstInputs
+                initialSteering)
         execution <- case raced of
-            Left failure -> do
-                (state, progress) <- readIORef progressRef
-                handleLoopEventFailure unexpected state progress failure
+            Left failure ->
+                runLoopMInIO ctx $ handleLoopEventFailureM failure
             Right completed -> pure completed
         flushEventPump eventPump >>= \case
             Left failure ->
-                readIORef progressRef >>= \(state, progress) ->
-                    handleLoopEventFailure unexpected state progress failure
+                runLoopMInIO ctx $ handleLoopEventFailureM failure
             Right () -> pure execution
+
+handleLoopEventFailureM :: EventPumpFailure -> LoopM LoopExecution
+handleLoopEventFailureM = \case
+    EventPumpAsyncFailure exception ->
+        liftIO $ Exception.throwIO exception
+    EventPumpSyncFailure exception -> do
+        state <- getLoopState
+        unexpectedLoopException
+            (fst state.loopProgress)
+            (snd state.loopProgress)
+            exception
+
+finishLoopExecution
+    :: BackendSnapshot
+    -> LoopProgress
+    -> Either LoopError LoopResult
+    -> LoopM LoopExecution
+finishLoopExecution state progress result = do
+    currentState <- getLoopState
+    putLoopState currentState
+        { loopProgress = (state, progress)
+        }
+    (finishedChunks, currentChunks) <- readUncommittedText
+    providerTelemetry <-
+        asks (.ctxProviderTelemetryRef) >>= liftIO . fmap reverse . readIORef
+    let uncommittedText = Text.intercalate "\n\n" $
+            filter (not . Text.null) $
+                map (Text.concat . reverse)
+                    (reverse finishedChunks <> [currentChunks])
+    pure LoopExecution
+        { executionState = state.backendItems
+        , executionPendingInputs = currentState.loopPendingInputs
+        , executionProgress = progress
+        , executionUncommittedAssistantText =
+            if Text.null uncommittedText
+                then Nothing
+                else Just uncommittedText
+        , executionProviderTelemetry = providerTelemetry
+        , executionResult = result
+        }
+
+finishLoopCursor
+    :: LoopCursor
+    -> Either LoopError LoopResult
+    -> LoopM LoopExecution
+finishLoopCursor cursor =
+    finishLoopExecution cursor.cursorState cursor.cursorProgress
+
+unexpectedLoopException
+    :: BackendSnapshot
+    -> LoopProgress
+    -> SomeException
+    -> LoopM LoopExecution
+unexpectedLoopException state progress exception =
+    finishLoopExecution state progress
+        (Left (LoopUnexpected (exceptionSummary exception)))
+
+unexpectedLoopCursor
+    :: LoopCursor
+    -> SomeException
+    -> LoopM LoopExecution
+unexpectedLoopCursor cursor =
+    unexpectedLoopException
+        cursor.cursorState
+        cursor.cursorProgress
+
+protectLoopM :: LoopCursor -> LoopM LoopExecution -> LoopM LoopExecution
+protectLoopM cursor action = do
+    ctx <- ask
+    result <- liftIO $ tryAny $ runLoopMInIO ctx action
+    case result of
+        Left exception -> unexpectedLoopCursor cursor exception
+        Right execution -> pure execution
+
+runLoopBody :: Maybe Text -> [TurnInput] -> [TurnInput] -> LoopM LoopExecution
+runLoopBody previousResponseId firstInputs initialSteering = do
+    initial <- getLoopState
+    go LoopCursor
+        { cursorState = fst initial.loopProgress
+        , cursorProgress = snd initial.loopProgress
+        , cursorPreviousResponseId = previousResponseId
+        , cursorTurnsUsed = 0
+        , cursorInputs = firstInputs <> initialSteering
+        , cursorSteeringCount = length initialSteering
+        , cursorLastOutput = Nothing
+        , cursorTokenUsage = emptyTokenUsage
+        , cursorEmptyContinuations = 0
+        }
+
+go :: LoopCursor -> LoopM LoopExecution
+go cursor = do
+    modifyLoopState \state -> state
+        { loopProgress = (cursor.cursorState, cursor.cursorProgress)
+        , loopPendingInputs = cursor.cursorInputs
+        }
+    maxTurns <- asks (.ctxConfig.loopMaxTurns)
+    if cursor.cursorTurnsUsed >= maxTurns
+        then finishLoopCursor cursor $ case cursor.cursorLastOutput of
+            Just turn -> Left (LoopMaxTurns turn)
+            Nothing -> Left LoopNoResponseId
+        else protectLoopM cursor do
+            cancelled <- isCancelledLoop
+            if cancelled
+                then finishLoopCursor cursor (Left (LoopCancelled []))
+                else do
+                    asks (.ctxEventPump) >>= liftIO . flip emitLoopEvent TurnStarted
+                    outputSeenRef <- liftIO $ newIORef False
+                    ctx <- ask
+                    raced <- liftIO $ submitTurnRaced ctx cursor outputSeenRef
+                    case raced of
+                        Left () ->
+                            finishLoopCursor cursor
+                                (Left (LoopCancelled []))
+                        Right (Left err) -> do
+                            emitted <- liftIO $ readIORef outputSeenRef
+                            finishLoopCursor cursor $ Left $
+                                if emitted
+                                    then LoopTransportAfterOutput err
+                                    else LoopTransport err
+                        Right (Right BackendResult{backendOutput = turn})
+                            | Text.null turn.responseId ->
+                                finishLoopCursor cursor
+                                    (Left LoopNoResponseId)
+                        Right (Right BackendResult{..}) -> do
+                            modifyLoopState \state -> state
+                                { loopProgress = (backendState, ResponseCommitted)
+                                }
+                            continueCommitted
+                                cursor
+                                    { cursorState = backendState
+                                    , cursorProgress = ResponseCommitted
+                                    }
+                                backendOutput
+
+submitTurnRaced
+    :: LoopContext
+    -> LoopCursor
+    -> IORef Bool
+    -> IO (Either () (Either ApiError BackendResult))
+submitTurnRaced ctx cursor outputSeenRef = mask \restore ->
+    withAsync
+        (restore $ submitTurnIO ctx cursor outputSeenRef)
+        \submission -> do
+            result <- restore $ race
+                (waitCancel ctx.ctxConfig.loopCancel)
+                (waitCatch submission)
+            normalized <- case result of
+                Left () -> do
+                    _ <- restore $
+                        timeout 2000000
+                            (tryAny ctx.ctxConfig.loopInterrupt)
+                    _ <- restore $
+                        timeout 2000000 (waitCatch submission)
+                    pure (Left ())
+                Right (Left exception) ->
+                    Exception.throwIO exception
+                Right (Right completed) ->
+                    pure (Right completed)
+            case normalized of
+                Right (Right backendResult@BackendResult{..})
+                    | not (Text.null backendOutput.responseId) -> do
+                        committed <-
+                            ctx.ctxConfig.loopBackendState.commitBackendState
+                                backendState
+                        writeIORef ctx.ctxStateRef LoopState
+                            { loopProgress = (committed, ResponseCommitted)
+                            , loopPendingInputs = cursor.cursorInputs
+                            }
+                        pure $ Right $ Right $
+                            backendResult { backendState = committed }
+                _ -> pure normalized
+
+submitTurnIO
+    :: LoopContext
+    -> LoopCursor
+    -> IORef Bool
+    -> IO (Either ApiError BackendResult)
+submitTurnIO ctx cursor outputSeenRef =
+    ctx.ctxConfig.loopBackend.submitTurn
+        cursor.cursorState
+        cursor.cursorPreviousResponseId
+        cursor.cursorInputs
+        (\event -> do
+            case event of
+                TextDelta _ -> writeIORef outputSeenRef True
+                ReasoningDelta _ -> writeIORef outputSeenRef True
+                ResponseAttemptDiscarded -> writeIORef outputSeenRef False
+                _ -> pure ()
+            ctx.ctxConfig.loopOnEvent event)
+
+continueCommitted
+    :: LoopCursor
+    -> TurnOutput
+    -> LoopM LoopExecution
+continueCommitted cursor turn = do
+    modifyLoopState \state -> state
+        { loopProgress = (cursor.cursorState, ResponseCommitted)
+        , loopPendingInputs = []
+        }
+    modifyUncommittedText \_ -> ([], [])
+    case turn.providerTelemetry of
+        Nothing -> pure ()
+        Just telemetry -> appendProviderTelemetry telemetry
+    protectLoopM cursor do
+        cancelledMid <- isCancelledLoop
+        if cancelledMid
+            then finishLoopCursor cursor (Left (LoopCancelled []))
+            else do
+                asks (.ctxEventPump) >>= liftIO . flip emitLoopEvent (TurnFinished turn)
+                case turn.completion of
+                    TurnIncomplete{} ->
+                        finishLoopCursor cursor
+                            (Left (LoopIncomplete turn))
+                    TurnCompleted -> do
+                        commitSteering <-
+                            asks (.ctxConfig.loopCommitSteering)
+                        liftIO $ commitSteering cursor.cursorSteeringCount
+                        results <-
+                            if null turn.toolCalls
+                                then pure []
+                                else runToolCallsM turn.toolCalls
+                        modifyLoopState \state -> state
+                            { loopPendingInputs = map CompletedTool results
+                            }
+                        cancelledAfter <- isCancelledLoop
+                        if cancelledAfter
+                            then finishLoopCursor cursor
+                                (Left (LoopCancelled results))
+                            else do
+                                readSteering <- asks (.ctxConfig.loopReadSteering)
+                                steering <- liftIO readSteering
+                                let continuation =
+                                        map CompletedTool results <> steering
+                                case decideCompletedTurn
+                                    cursor
+                                    turn
+                                    continuation
+                                    (length steering) of
+                                    ContinueLoop nextCursor -> go nextCursor
+                                    FinishLoop result ->
+                                        finishLoopCursor cursor (Right result)
+                                    WarnAndFinishLoop result -> do
+                                        asks (.ctxEventPump) >>=
+                                            liftIO . flip emitLoopEvent
+                                                (WarningRaised
+                                                    emptyContinuationWarning)
+                                        finishLoopCursor cursor (Right result)
 
 data LoopEventCoalescingKey
     = AssistantTextDelta
@@ -878,18 +983,6 @@ toolOutputOmissionMarker = "[earlier tool output truncated]\n"
 loopEventTailPayloadBudgetCodeUnits :: Int
 loopEventTailPayloadBudgetCodeUnits =
     (8 * 1024 * 1024 - 64) `div` 4
-
-handleLoopEventFailure
-    :: (BackendSnapshot -> LoopProgress -> SomeException -> IO LoopExecution)
-    -> BackendSnapshot
-    -> LoopProgress
-    -> EventPumpFailure
-    -> IO LoopExecution
-handleLoopEventFailure unexpected state progress = \case
-    EventPumpSyncFailure exception ->
-        unexpected state progress exception
-    EventPumpAsyncFailure exception ->
-        Exception.throwIO exception
 
 -- | Preserve model order between conflicting calls while allowing independent
 -- calls from the same model turn to overlap. Results are returned in model

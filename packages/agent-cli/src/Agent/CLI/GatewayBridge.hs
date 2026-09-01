@@ -72,7 +72,8 @@ import System.Directory
     , doesFileExist
     , removeFile
     )
-import System.OsPath (OsPath, unsafeEncodeUtf, (</>))
+import Agent.OsPath (unsafeEncodeUtf)
+import System.OsPath (OsPath, (</>))
 import System.Posix.Files (setFileMode)
 import System.Posix.Process (getProcessID)
 

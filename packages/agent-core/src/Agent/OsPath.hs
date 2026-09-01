@@ -3,21 +3,25 @@
 -- Import 'OsPath' and the standard encoding functions directly from
 -- "System.OsPath".
 module Agent.OsPath
-    ( directoryChain
+    ( decodeUtf
+    , directoryChain
     , fromText
     , normalizeLexically
     , relativeDisplayPath
     , toText
+    , unsafeEncodeUtf
     , unsafeToFilePath
     ) where
 
 import Control.Exception.Safe (impureThrow)
+import Data.Foldable (foldl')
 import Data.Text (Text)
 import qualified Data.Text as Text
 import System.OsPath
     ( OsPath
     , decodeUtf
     , dropTrailingPathSeparator
+    , encodeUtf
     , isAbsolute
     , joinPath
     , makeRelative
@@ -26,7 +30,6 @@ import System.OsPath
     , takeDirectory
     , (</>)
     )
-import qualified System.OsPath as OsPath
 
 -- | Directories from @root@ through @cwd@, inclusive.
 --
@@ -101,7 +104,12 @@ dotdot = fromText ".."
 
 -- | Pure UTF encoding for path values that originate as Unicode text.
 fromText :: Text -> OsPath
-fromText = OsPath.unsafeEncodeUtf . Text.unpack
+fromText = either impureThrow id . encodeUtf . Text.unpack
+
+-- | Compatibility alias for code written against older @filepath@ versions
+-- that exported @unsafeEncodeUtf@ from "System.OsPath".
+unsafeEncodeUtf :: String -> OsPath
+unsafeEncodeUtf = either impureThrow id . encodeUtf
 
 -- | Render a path for human-readable output.
 --
@@ -109,7 +117,7 @@ fromText = OsPath.unsafeEncodeUtf . Text.unpack
 -- fallback is suitable for diagnostics, never filesystem access.
 toText :: OsPath -> Text
 toText path =
-    either (const (Text.pack (show path))) Text.pack (OsPath.decodeUtf path)
+    either (const (Text.pack (show path))) Text.pack (decodeUtf path)
 
 -- | Decode a UTF-encoded path for APIs that still require 'FilePath'.
 --

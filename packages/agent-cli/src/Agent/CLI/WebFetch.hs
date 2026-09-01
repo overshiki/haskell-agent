@@ -30,6 +30,7 @@ import Data.Bits ((.&.), shiftR)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (isAlphaNum)
+import Data.Foldable (foldl')
 import Data.IORef (readIORef)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)

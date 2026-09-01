@@ -13,7 +13,7 @@ import Agent.CLI.Input.Types (DisplayCell(..))
 import Agent.TUI.TextWidth (clampGraphemeCursor)
 import Data.ByteString (ByteString)
 import Data.Char (isControl)
-import Data.Foldable (toList)
+import Data.Foldable (foldl', toList)
 import Data.Maybe (fromMaybe)
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
