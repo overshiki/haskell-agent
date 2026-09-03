@@ -193,8 +193,6 @@ runFullscreen runtime workerAction = do
                     -- that we can classify.
                     when (V.supportsMode output V.BracketedPaste) $
                         V.setMode output V.BracketedPaste True
-                    when (V.supportsMode output V.Mouse) $
-                        V.setMode output V.Mouse True
                     when (V.supportsMode output V.Focus) $
                         V.setMode output V.Focus True
                     -- Vty deliberately leaves OSC 8 output disabled by
@@ -211,10 +209,14 @@ runFullscreen runtime workerAction = do
                     applyStoredFullscreenWindowTitle
                         runtime
                         (V.outputIface wrapped)
+                    applyStoredMouseCapture
+                        runtime
+                        (V.outputIface wrapped)
                     pure wrapped
             setupVty `onException` V.shutdown vty
     withTrackedVtyBuilder makeVty \buildVty -> do
         initialVty <- buildVty
+        initialMouseCapture <- readIORef runtime.runtimeMouseCapture
         let
             initialState =
                 initialFullscreenAppState
@@ -223,6 +225,7 @@ runFullscreen runtime workerAction = do
                     initialAgent
                     initialAgents
                     initialClock
+                    initialMouseCapture
             (initialDemand, initialDelay) =
                 appMotionTiming initialState
         atomically $
@@ -411,8 +414,10 @@ initialFullscreenAppState
     -> AgentTarget
     -> [AgentEntry]
     -> Word64
+    -> Bool
     -> AppState
-initialFullscreenAppState runtime history initialAgent initialAgents initialClock =
+initialFullscreenAppState
+    runtime history initialAgent initialAgents initialClock initialMouseCapture =
     AppState
         { appUi = runtime.runtimeInitial
         , appHistoryWindow =
@@ -463,6 +468,7 @@ initialFullscreenAppState runtime history initialAgent initialAgents initialCloc
         , appLastTurnCompletedAt = Nothing
         , appConversationReflowQueued = False
         , appWindowTitle = Nothing
+        , appMouseCapture = initialMouseCapture
         , appMotionElapsedMillis = 0
         , appCompletionFlashes = Map.empty
         , appMotionScheduleReset = False

@@ -46,7 +46,10 @@ import Agent.CLI.Options
       ScreenMode(ScreenMinimal) )
 import Agent.CLI.PendingInputs ()
 import Agent.CLI.Plan ()
-import Agent.CLI.Project ()
+import Agent.CLI.Project
+    ( loadUserSettings
+    , ProjectSettings(settingsMouseCapture)
+    )
 import Agent.CLI.Prompt ()
 import Agent.CLI.PromptHooks ()
 import Agent.CLI.Provider.OpenAI ()
@@ -738,7 +741,8 @@ prepareAgentIterationTracked
     fullscreen <- case activeFullscreen of
         Just runtime -> pure (Just runtime)
         Nothing
-            | fullscreenEnabled ->
+            | fullscreenEnabled -> do
+                userSettings <- loadUserSettings home
                 Just <$> newFullscreenRuntime
                     fullscreenInputs
                     (readIORef cancelToolRef >>= id)
@@ -763,6 +767,7 @@ prepareAgentIterationTracked
                     options.optMotionMode
                     useColor
                     initialFullscreenState
+                    userSettings.settingsMouseCapture
             | otherwise -> pure Nothing
     forM_ fullscreen \runtime ->
         case resumed of

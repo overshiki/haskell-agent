@@ -83,6 +83,8 @@ module Agent.CLI.TUI.App
     , showFullscreenToolImage
     , toolImageBlockId
     , applyStoredFullscreenWindowTitle
+    , applyStoredMouseCapture
+    , mouseCaptureStatus
     , turnCompletionRequiresRedraw
     , syntaxLanguagesForBlocks
     , uiEventRestartsMotionSchedule

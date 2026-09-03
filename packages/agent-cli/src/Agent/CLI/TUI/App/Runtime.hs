@@ -200,6 +200,7 @@ newFullscreenRuntime
     -> MotionMode
     -> Bool
     -> UiState
+    -> Bool
     -> IO FullscreenRuntime
 newFullscreenRuntime =
     newFullscreenRuntimeWithSyntaxLoader newSyntaxHighlighter
@@ -220,6 +221,7 @@ newFullscreenRuntimeWithSyntaxLoader
     -> MotionMode
     -> Bool
     -> UiState
+    -> Bool
     -> IO FullscreenRuntime
 newFullscreenRuntimeWithSyntaxLoader
     syntaxLoader
@@ -236,7 +238,8 @@ newFullscreenRuntimeWithSyntaxLoader
     syntaxLoadFinished
     motionMode
     color
-    initial = do
+    initial
+    mouseCapture = do
         events <- newBChan appEventChannelCapacity
         mailbox <- AppEventMailbox <$> newTVarIO AppEventMailboxState
             { mailboxPendingEvents = Seq.empty
@@ -263,6 +266,7 @@ newFullscreenRuntimeWithSyntaxLoader
         imagePreviewInTmux <- isJust <$> lookupEnv "TMUX"
         colorFgBg <- lookupEnv "COLORFGBG"
         windowTitle <- newIORef Nothing
+        mouseCaptureRef <- newIORef mouseCapture
         sessionActions <- newIORef FullscreenSessionActions
             { sessionProvider = Nothing
             , sessionCancel = cancelAction
@@ -274,8 +278,8 @@ newFullscreenRuntimeWithSyntaxLoader
             , sessionAgentSnapshot = agentSnapshot
             , sessionAgentSelect = agentSelect
             }
-        pure FullscreenRuntime
-            { runtimeEvents = events
+        let runtime = FullscreenRuntime {
+            runtimeEvents = events
             , runtimeMailbox = mailbox
             , runtimeInput = inputBuffer
             , runtimeCancel =
@@ -296,6 +300,10 @@ newFullscreenRuntimeWithSyntaxLoader
             , runtimeCopy = copyAction
             , runtimeSetWindowTitle = setWindowTitle
             , runtimeWindowTitle = windowTitle
+            , runtimeSetMouseCapture = \captured -> do
+                writeIORef mouseCaptureRef captured
+                enqueueAppEvent runtime (AppSetMouseCapture captured)
+            , runtimeMouseCapture = mouseCaptureRef
             , runtimeNativeProgress = nativeProgress
             , runtimeAgentSnapshot =
                 readIORef sessionActions >>= (.sessionAgentSnapshot)
@@ -327,6 +335,7 @@ newFullscreenRuntimeWithSyntaxLoader
             , runtimeHistoryGeneration = historyGeneration
             , runtimeDictationJobs = dictationJobs
             }
+        pure runtime
 
 setFullscreenSessionActions
     :: FullscreenRuntime
@@ -563,6 +572,20 @@ applyStoredFullscreenWindowTitle runtime output =
 writeOutputWindowTitle :: V.Output -> Text -> IO ()
 writeOutputWindowTitle output title =
     V.outputByteBuffer output (oscWindowTitleBytes title)
+
+-- | Re-assert the latched mouse-capture mode on a (possibly rebuilt) Vty.
+-- Brick's suspend/resume rebuilds Vty through the same startup path, so a
+-- stored @False@ survives suspension instead of being overwritten by the
+-- default mouse-enable.
+applyStoredMouseCapture :: FullscreenRuntime -> V.Output -> IO ()
+applyStoredMouseCapture runtime output =
+    readIORef runtime.runtimeMouseCapture >>= \captured ->
+        applyMouseCaptureToOutput output captured
+
+applyMouseCaptureToOutput :: V.Output -> Bool -> IO ()
+applyMouseCaptureToOutput output captured =
+    when (V.supportsMode output V.Mouse) $
+        V.setMode output V.Mouse captured
 
 setFullscreenImagePreviews
     :: FullscreenRuntime

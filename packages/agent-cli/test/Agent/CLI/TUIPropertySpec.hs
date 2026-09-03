@@ -713,6 +713,7 @@ makeBaseState = do
             MotionOff
             False
             initialUiState
+            True
     pure $
         initialFullscreenAppState
             runtime
@@ -720,6 +721,7 @@ makeBaseState = do
             AgentRoot
             [rootEntry]
             0
+            True
 
 instance Arbitrary RenderTrace where
     arbitrary = sized \size -> do

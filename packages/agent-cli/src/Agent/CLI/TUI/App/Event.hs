@@ -531,6 +531,10 @@ handleEventInner' event = case event of
         vty <- getVtyHandle
         liftIO (writeOutputWindowTitle (V.outputIface vty) title)
         modify' \current -> current { appWindowTitle = Just title }
+    AppEvent (AppSetMouseCapture captured) -> do
+        vty <- getVtyHandle
+        liftIO (applyMouseCaptureToOutput (V.outputIface vty) captured)
+        modify' \current -> current { appMouseCapture = captured }
     AppEvent AppSyntaxHighlighterChanged -> do
         state <- get
         when (state.appTerminalFocus /= TerminalUnfocused) do

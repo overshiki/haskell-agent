@@ -14,6 +14,7 @@ module Agent.CLI.Project
     , projectModelProvider
     , projectSettingsPath
     , resolveProjectRoot
+    , saveMouseCapture
     , saveProjectAutoApprove
     , saveProjectMaxConcurrentAgents
     , saveProjectAccount
@@ -94,6 +95,7 @@ data ProjectSettings = ProjectSettings
     , settingsLastModel :: !(Maybe ProjectModel)
     , settingsLastAccounts :: ![ProjectAccount]
     , settingsMaxConcurrentAgents :: !(Maybe Int)
+    , settingsMouseCapture :: !Bool
     } deriving (Eq, Show)
 
 defaultProjectSettings :: ProjectSettings
@@ -103,6 +105,7 @@ defaultProjectSettings = ProjectSettings
     , settingsLastModel = Nothing
     , settingsLastAccounts = []
     , settingsMaxConcurrentAgents = Nothing
+    , settingsMouseCapture = True
     }
 
 instance ToJSON ProjectAccount where
@@ -184,6 +187,7 @@ instance ToJSON ProjectSettings where
         , "lastModel" .= settings.settingsLastModel
         , "lastAccounts" .= settings.settingsLastAccounts
         , "maxConcurrentAgents" .= settings.settingsMaxConcurrentAgents
+        , "mouseCapture" .= settings.settingsMouseCapture
         ]
 
 projectSettingsDecoder :: Hermes.Decoder ProjectSettings
@@ -194,6 +198,7 @@ projectSettingsDecoder = Hermes.object do
         lastAccountsValue <- defaultKey [] "lastAccounts"
             (Hermes.list (lenient projectAccountDecoder))
         maxConcurrentAgents <- optionalKey "maxConcurrentAgents" Hermes.int
+        mouseCapture <- defaultKey True "mouseCapture" Hermes.bool
         pure ProjectSettings
             { settingsVersion = version
             , settingsAutoApprove = autoApprove
@@ -202,6 +207,7 @@ projectSettingsDecoder = Hermes.object do
             , settingsLastModel = lastModelValue >>= id
             , settingsLastAccounts = mapMaybe id lastAccountsValue
             , settingsMaxConcurrentAgents = maxConcurrentAgents
+            , settingsMouseCapture = mouseCapture
             }
 
 lenient :: Hermes.Decoder a -> Hermes.Decoder (Maybe a)
@@ -258,6 +264,14 @@ saveProjectAutoApprove :: OsPath -> Bool -> IO ()
 saveProjectAutoApprove projectRoot autoApprove =
     updateProjectSettings projectRoot \settings ->
         settings { settingsAutoApprove = autoApprove }
+
+-- | Persist the fullscreen mouse-capture preference. The same schema backs
+-- user-level settings, so a terminal preference can be stored under
+-- @~/.haskell-agent/settings.json@ by passing the home directory.
+saveMouseCapture :: OsPath -> Bool -> IO ()
+saveMouseCapture projectRoot captured =
+    updateProjectSettings projectRoot \settings ->
+        settings { settingsMouseCapture = captured }
 
 -- | Persist the project's concurrent subagent cap.
 saveProjectMaxConcurrentAgents :: OsPath -> Int -> IO ()

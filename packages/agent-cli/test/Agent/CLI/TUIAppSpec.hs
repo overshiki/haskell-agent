@@ -10,6 +10,7 @@ import Agent.CLI.Input (ReplLine(..), terminalTextWidth)
 import Agent.CLI.Interrupt (CtrlCDecision(..))
 import Agent.CLI.TUI.App
     ( applyStoredFullscreenWindowTitle
+    , applyStoredMouseCapture
     , applyMetaConsoleEdit
     , applyTextPromptEdit
     , advanceCompletionFlashes
@@ -32,6 +33,7 @@ import Agent.CLI.TUI.App
     , initialFullscreenAppState
     , isMetaConsoleToggle
     , mergeConversationView
+    , mouseCaptureStatus
     , newFullscreenInputBuffer
     , newFullscreenRuntime
     , withTrackedVtyBuilder
@@ -426,7 +428,7 @@ spec = do
                         Right () -> pure ()
             let request = "connect my Grok account"
                 initialState =
-                    initialFullscreenAppState runtime [] AgentRoot [] 0
+                    initialFullscreenAppState runtime [] AgentRoot [] 0 True
                 script =
                     [ FullscreenScriptVty
                         (V.EvKey (V.KChar 'k') [V.MMeta])
@@ -705,6 +707,7 @@ spec = do
                 MotionFull
                 False
                 initialUiState
+                True
             (_, output) <- VMock.mockTerminal (80, 24)
             let title = "⠋ New session"
             setFullscreenWindowTitle runtime title
@@ -721,6 +724,68 @@ spec = do
             actual
                 `shouldSatisfy`
                     any (ByteString.isInfixOf (ByteString.pack [0xE2, 0xA0, 0x8B]))
+
+    describe "fullscreen mouse capture" do
+        it "latches the capture state, notifies the app, and replays it" do
+            modes <- newIORef ([] :: [(V.Mode, Bool)])
+            input <- newFullscreenInputBuffer
+            runtime <- newFullscreenRuntime
+                input
+                (pure ())
+                (const (pure ()))
+                (pure WarnExit)
+                (const (pure True))
+                (const (pure ()))
+                (const (pure ()))
+                (pure (AgentRoot, []))
+                (const (pure ()))
+                (pure ())
+                (const (pure ()))
+                MotionFull
+                False
+                initialUiState
+                True
+            readIORef runtime.runtimeMouseCapture `shouldReturn` True
+            (_, output) <- VMock.mockTerminal (80, 24)
+            let recording = output
+                    { V.supportsMode = const True
+                    , V.setMode = \mode enabled ->
+                        modifyIORef' modes (<> [(mode, enabled)])
+                    }
+            applyStoredMouseCapture runtime recording
+            readIORef modes `shouldReturn` [(V.Mouse, True)]
+
+            runtime.runtimeSetMouseCapture False
+            readIORef runtime.runtimeMouseCapture `shouldReturn` False
+            -- A rebuilt Vty (Brick suspend/resume) re-applies the stored
+            -- latch instead of the historical always-on default.
+            applyStoredMouseCapture runtime recording
+            readIORef modes
+                `shouldReturn` [(V.Mouse, True), (V.Mouse, False)]
+
+        it "flips app state through the app event and seeds initial state" do
+            runtime <- newScriptRuntime initialUiState
+            let initialState =
+                    initialFullscreenAppState runtime [] AgentRoot [] 0 True
+            initialState.appMouseCapture `shouldBe` True
+            let offState =
+                    initialFullscreenAppState runtime [] AgentRoot [] 0 False
+            offState.appMouseCapture `shouldBe` False
+            (_, finalState) <- runFullscreenScriptWithState
+                initialState
+                [ FullscreenScriptApp (AppSetMouseCapture False)
+                , FullscreenScriptHalt
+                ]
+            finalState.appMouseCapture `shouldBe` False
+
+    describe "mouseCaptureStatus" do
+        it "renders nothing while capture is on" $
+            mouseCaptureStatus True `shouldBe` ""
+
+        it "warns that native selection replaced wheel and clicks" $ do
+            mouseCaptureStatus False
+                `shouldSatisfy` Text.isPrefixOf "mouse off · native selection"
+            mouseCaptureStatus False `shouldSatisfy` Text.isSuffixOf "│ "
 
     describe "fullscreen Vty ownership" do
         it "shuts down the rebuilt Vty when exit follows suspension" do
@@ -1444,7 +1509,7 @@ runMetaConsoleSubmission running = do
     runtime <- newScriptRuntime ui
     let request = "connect my Grok account"
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptVty
                 (V.EvKey (V.KChar 'k') [V.MMeta])
@@ -1493,7 +1558,7 @@ replacementAfterHistoryReplacement scenario = do
             , historyTurnBlocks = Seq.singleton durableBlock
             }
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
 
     -- A single custom-event channel makes each focus/history sequence
     -- deterministic while still running the real Brick event handler.
@@ -1551,7 +1616,7 @@ replacementPreservesFollow follow = do
                             (replicate 12 "short durable transcript line")))
             }
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptApp AppHistoryLiveStarted
             , FullscreenScriptApp
@@ -1571,7 +1636,7 @@ committedPreviewKeys = do
     runtime <- newScriptRuntime initialUiState
     let liveUi = reduceUi (UiUserSubmitted "question") initialUiState
         initialState =
-            (initialFullscreenAppState runtime [] AgentRoot [] 0)
+            (initialFullscreenAppState runtime [] AgentRoot [] 0 True)
                 { appUi = liveUi
                 , appHistoryLiveStart = Just 0
                 , appSubmittedImagePreviews =
@@ -1599,7 +1664,7 @@ resetPreviewState = do
     writeIORef runtime.runtimeSubmittedImagePlacements
         [historyPlacement (historyPreview 1)]
     let initialState =
-            (initialFullscreenAppState runtime [] AgentRoot [] 0)
+            (initialFullscreenAppState runtime [] AgentRoot [] 0 True)
                 { appSubmittedImagePreviews =
                     Map.singleton (BlockId 0) [historyPreview 1]
                 }
@@ -1641,7 +1706,7 @@ evictedPreviewKeys = do
             either (error . show) id
                 (applyHistoryPage existingPage initialWindow)
         initialState =
-            (initialFullscreenAppState runtime [] AgentRoot [] 0)
+            (initialFullscreenAppState runtime [] AgentRoot [] 0 True)
                 { appHistoryWindow = existingWindow
                 , appNextHistoryBlockId = -3
                 , appSubmittedImagePreviews =
@@ -1717,7 +1782,7 @@ unfocusedPasteRendersDraft = do
     runtime <- newScriptRuntime initialUiState
     let marker = "IMPLICIT_FOCUS_DRAFT"
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptVty V.EvLostFocus
             , FullscreenScriptVty (V.EvPaste (encoded marker))
@@ -1732,7 +1797,7 @@ unfocusedTextPromptIsVisible = do
     reply <- newEmptyTMVarIO
     let marker = "HIDDEN_TEXT_PROMPT_MARKER"
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptVty V.EvLostFocus
             , FullscreenScriptApp
@@ -1752,7 +1817,7 @@ unfocusedSubmissionIsVisible = do
     runtime <- newScriptRuntime initialUiState
     let marker = "HIDDEN_SUBMITTED_PROMPT"
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptVty V.EvLostFocus
             , FullscreenScriptApp (AppUi (UiUserSubmitted marker))
@@ -1789,7 +1854,7 @@ unfocusedHistoryResetIsVisible = do
             , historyPageHasNewer = False
             }
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptApp
                 (AppUi (UiAssistantHistory liveTranscript))
@@ -1805,7 +1870,7 @@ unfocusedStopHalts :: IO ()
 unfocusedStopHalts = do
     runtime <- newScriptRuntime initialUiState
     let initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
     _ <- runFullscreenScript
         initialState
         [ FullscreenScriptVty V.EvLostFocus
@@ -1819,7 +1884,7 @@ unfocusedSuspendRuns = do
     actionRan <- newIORef False
     reply <- newEmptyTMVarIO
     let initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
     _ <- runFullscreenScript
         initialState
         [ FullscreenScriptVty V.EvLostFocus
@@ -1834,7 +1899,7 @@ unfocusedStreamingRemainsThrottled = do
     runtime <- newScriptRuntime initialUiState
     let marker = "HIDDEN_STREAMING_DELTA"
         initialState =
-            initialFullscreenAppState runtime [] AgentRoot [] 0
+            initialFullscreenAppState runtime [] AgentRoot [] 0 True
         script =
             [ FullscreenScriptVty V.EvLostFocus
             , FullscreenScriptApp (AppUi (UiLoop (TextDelta marker)))
@@ -1861,6 +1926,7 @@ newScriptRuntime ui = do
         MotionFull
         False
         ui
+        True
 
 runFullscreenScript
     :: AppState

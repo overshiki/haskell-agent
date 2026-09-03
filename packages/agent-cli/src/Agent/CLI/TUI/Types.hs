@@ -160,6 +160,9 @@ data AppEvent
     | AppDictationFinished !(Either Text Text)
     | AppAgentSnapshot !AgentTarget ![AgentEntry]
     | AppSetWindowTitle !Text
+    | AppSetMouseCapture !Bool
+      -- ^ Latched mouse-capture toggle. @False@ releases the terminal's
+      -- native text selection until the user re-enables capture.
     | AppSyntaxHighlighterChanged
     | AppHistoryReset !HistoryPage
     | AppHistoryLoaded
@@ -243,6 +246,8 @@ data FullscreenRuntime = FullscreenRuntime
     , runtimeCopy :: !(Text -> IO Bool)
     , runtimeSetWindowTitle :: !(Text -> IO ())
     , runtimeWindowTitle :: !(IORef (Maybe Text))
+    , runtimeSetMouseCapture :: !(Bool -> IO ())
+    , runtimeMouseCapture :: !(IORef Bool)
     , runtimeNativeProgress :: !(Bool -> IO ())
     , runtimeAgentSnapshot :: !(IO (AgentTarget, [AgentEntry]))
     , runtimeAgentSelect :: !(AgentTarget -> IO ())
@@ -349,6 +354,7 @@ data AppState = AppState
     , appLastTurnCompletedAt :: !(Maybe Word64)
     , appConversationReflowQueued :: !Bool
     , appWindowTitle :: !(Maybe Text)
+    , appMouseCapture :: !Bool
     , appMotionElapsedMillis :: !Int
     , appCompletionFlashes :: !(Map.Map BlockId Int)
     , appMotionScheduleReset :: !Bool

@@ -51,6 +51,9 @@ data ReplAction
     | ReplSetModel Text
     | ReplEnableCodeMode
     | ReplToggleAlwaysApprove
+    | ReplMouseCapture (Maybe Bool)
+      -- ^ @Nothing@ toggles fullscreen mouse capture; @Just@ sets it
+      -- explicitly so @/mouse off@ releases native terminal selection.
     | ReplPlan (Maybe Text)
     -- ^ Enter plan mode. @Just@ starts a turn with that description.
     | ReplViewPlan

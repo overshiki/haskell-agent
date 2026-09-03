@@ -22,6 +22,7 @@ module Agent.CLI.Command
     , lookupSlashCommandIn
     , loopScheduleInstruction
     , mkSlashCatalog
+    , nextMouseCapture
     , slashCatalogWithSkills
     , parseReplLine
     , parseReplLineWithCatalog
@@ -410,6 +411,11 @@ parseSlash catalog raw line = case Text.words line of
                 if null args
                     then ReplShowTerminal
                     else ReplCommandError "usage: /terminal"
+            "mouse" -> case args of
+                [] -> ReplMouseCapture Nothing
+                ["on"] -> ReplMouseCapture (Just True)
+                ["off"] -> ReplMouseCapture (Just False)
+                _ -> ReplCommandError "usage: /mouse [on|off]"
             "agents" -> parseAgentsCommand args
             "mcp" -> case args of
                 [] -> ReplMcp
@@ -456,6 +462,11 @@ parseSlash catalog raw line = case Text.words line of
 unknownCommand :: Text -> ReplAction
 unknownCommand command =
     ReplCommandError ("unknown command: " <> command <> " (try /help)")
+
+-- | Resolve a @/mouse@ target into the next capture state. An explicit
+-- @on@/@off@ argument wins; a bare toggle flips the current state.
+nextMouseCapture :: Bool -> Maybe Bool -> Bool
+nextMouseCapture current = fromMaybe (not current)
 
 lookupSkillCommandIn :: SlashCatalog -> Text -> Maybe SkillCommand
 lookupSkillCommandIn catalog raw =

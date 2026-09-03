@@ -18,6 +18,7 @@ import Agent.CLI.Clipboard ( loadImagesFromPastedText )
 import Agent.CLI.Command
     ( CopyRequest(..),
       formatSlashHelpWithCatalog,
+      nextMouseCapture,
       parseReplLineWithCatalog,
       ReplAction(ReplCommandError, ReplQuit, ReplReload,
                  ReplUpdateAndRestart, ReplPrompt, ReplExpandedPrompt,
@@ -31,7 +32,7 @@ import Agent.CLI.Command
                  ReplDesktop,
                  ReplShowTerminal, ReplShowEffort, ReplSetEffort, ReplShowModel,
                  ReplSetModel, ReplToggleFast, ReplEnableCodeMode,
-                 ReplToggleAlwaysApprove, ReplCompact, ReplPlan,
+                 ReplToggleAlwaysApprove, ReplMouseCapture, ReplCompact, ReplPlan,
                  ReplViewPlan, ReplQueue, ReplTranscript, ReplEditPrompt,
                  ReplContext, ReplHistory, ReplFind,
                  ReplBtw, ReplMetaConsole, ReplRecap, ReplRetry, ReplResume, ReplSearch,
@@ -110,7 +111,7 @@ import Agent.CLI.PendingInputs ()
 import Agent.CLI.Permission ( approvalPolicyOptions )
 import Agent.CLI.Plan ()
 import Agent.CLI.Progress ()
-import Agent.CLI.Project ()
+import Agent.CLI.Project ( saveMouseCapture )
 import Agent.CLI.Prompt ()
 import Agent.CLI.PromptHooks ()
 import Agent.CLI.Provider.OpenAI ()
@@ -216,7 +217,8 @@ import Agent.CLI.TUI.App
       withFullscreenSuspended )
 import Agent.CLI.TUI.SessionHistory ( sessionHistoryTurn )
 import Agent.CLI.TUI.Types
-    ( FullscreenRuntime(runtimeInput)
+    ( FullscreenRuntime(runtimeInput, runtimeMouseCapture,
+                       runtimeSetMouseCapture)
     , HistoryCommit(..)
     )
 import Agent.CLI.Terminal
@@ -869,6 +871,33 @@ handleReplLine
                             displayInfo message $
                                 putTextLn stderr (roleMuted color message)
                             continue
+                    ReplMouseCapture target -> do
+                        color <- resolveColor stderr
+                        case fullscreen of
+                            Nothing -> do
+                                let message =
+                                        "/mouse requires the fullscreen TUI"
+                                displayError message $
+                                    Text.hPutStrLn stderr (roleError color message)
+                                continue
+                            Just runtime -> do
+                                current <- readIORef runtime.runtimeMouseCapture
+                                let next = nextMouseCapture current target
+                                runtime.runtimeSetMouseCapture next
+                                saveMouseCapture env.sessionHome next
+                                let message
+                                        | next =
+                                            "mouse capture enabled · wheel \
+                                            \scroll and clicks active"
+                                        | otherwise =
+                                            "mouse capture disabled · native \
+                                            \text selection enabled (wheel \
+                                            \and clicks inactive; /mouse to \
+                                            \re-enable)"
+                                displayInfo message $
+                                    Text.putStrLn
+                                        (roleMuted color (glyphOk <> message))
+                                continue
                     ReplCompact focus -> do
                         color <- resolveColor stderr
                         result <-

@@ -15,3 +15,4 @@ packages/agent-openai/data/prompt.md
 packages/agent-openai/data
 cabal.project.local
 .cabal-build-aux
+*.log

@@ -3,6 +3,7 @@ module Agent.CLI.TUI.Render.Overlays
     ( drawNotice
     , drawFollowStatus
     , drawFooter
+    , mouseCaptureStatus
     , drawPermission
     , drawResume
     , drawChoice
@@ -65,7 +66,8 @@ import Agent.CLI.TUI.Types
       ChoicePresentation(ChoiceOnboarding, ChoiceDialog),
       AppState(appRuntime,
                appDictation, appTextPrompt, appChoice, appMetaConsole,
-               appMotionElapsedMillis, appUi, appTerminalFocus),
+               appMotionElapsedMillis, appUi, appTerminalFocus,
+               appMouseCapture),
       FullscreenRuntime(runtimeMotionMode, runtimeColor, runtimeWaveTrough),
       Name(ChoiceRow, PermissionRow, ResumeViewport,
            ResumeSearchCursor, ResumeRow, OverlayViewport, MarkdownLink,
@@ -239,7 +241,7 @@ drawFooter :: AppState -> Widget Name
 drawFooter state =
     withAttr Theme.footerAttr $
         padLeftRight 2 $
-            txt footer
+            txt (mouseCaptureStatus state.appMouseCapture <> footer)
   where
     footer = case
         ( state.appDictation
@@ -278,6 +280,14 @@ drawFooter state =
                             "Enter steer  │  Ctrl+R dictate  │  Ctrl+Enter/Ctrl+O send now  │  Esc/Ctrl+C cancel  │  Tab scrollback  │  ⌘K meta"
                         | otherwise ->
                             "Enter send  │  Ctrl+R dictate  │  Shift+Enter newline  │  PgUp/PgDn scroll  │  Tab scrollback  │  ⌘K meta"
+
+-- | Footer prefix shown while mouse capture is released. Native selection
+-- works again, but wheel scrolling and clickable controls are dead, so the
+-- chrome keeps saying so until capture is re-enabled.
+mouseCaptureStatus :: Bool -> Text
+mouseCaptureStatus captured
+    | captured = ""
+    | otherwise = "mouse off · native selection │ "
 
 drawPermission :: AppState -> PermissionOverlay -> Widget Name
 drawPermission state permission =

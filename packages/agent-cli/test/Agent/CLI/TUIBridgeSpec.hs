@@ -148,6 +148,7 @@ spec = describe "fullscreen TUI bridge" do
             MotionFull
             False
             initialUiState
+            True
         completed <- timeout 2000000 $
             replicateM_ 2000 do
                 emitUiEvent runtime (UiLoop (TextDelta "x"))
@@ -344,6 +345,7 @@ spec = describe "fullscreen TUI bridge" do
             MotionFull
             False
             initialUiState
+            True
         runtime.runtimeCancel
         setFullscreenSessionActions
             runtime
@@ -391,6 +393,7 @@ spec = describe "fullscreen TUI bridge" do
             MotionFull
             False
             initialUiState
+            True
         readIORef loaderCalled `shouldReturn` False
         loadSyntaxHighlighterForRuntime runtime
         readIORef loaderCalled `shouldReturn` True
@@ -415,6 +418,7 @@ spec = describe "fullscreen TUI bridge" do
             MotionFull
             False
             initialUiState
+            True
         loadSyntaxHighlighterForRuntime runtime
         hasPendingUnavailableSyntax runtime `shouldReturn` True
 
@@ -485,6 +489,7 @@ newBridgeTestRuntime = do
         MotionFull
         False
         initialUiState
+        True
 
 isTurnStarted :: PendingAppEvent -> Bool
 isTurnStarted = \case

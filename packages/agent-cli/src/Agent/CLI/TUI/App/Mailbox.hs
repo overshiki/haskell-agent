@@ -677,6 +677,7 @@ appEventLogicalBytes = \case
             (agentTargetLogicalBytes target)
             entries
     AppSetWindowTitle text -> logicalTextBytes text
+    AppSetMouseCapture _ -> 256
     AppDictationPartial text -> logicalTextBytes text
     AppDictationFinished result ->
         either logicalTextBytes logicalTextBytes result

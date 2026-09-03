@@ -276,6 +276,23 @@ spec = describe "Agent.CLI.Project" do
                 settings.settingsLastModel `shouldBe` Nothing
                 settings.settingsLastAccounts `shouldBe` []
 
+        it "defaults mouse capture on for legacy settings and persists toggles" $
+            withTempDir "agent-project-" \root -> do
+                let dir = root </> fromFilePath ".haskell-agent"
+                    path = projectSettingsPath root
+                createDirectoryIfMissing True dir
+                LBS.writeFile
+                    (toFilePath path)
+                    "{\"version\":1,\"autoApprove\":true}"
+
+                settings <- loadProjectSettings root
+                settings.settingsMouseCapture `shouldBe` True
+
+                saveMouseCapture root False
+                updated <- loadProjectSettings root
+                updated.settingsMouseCapture `shouldBe` False
+                updated.settingsAutoApprove `shouldBe` True
+
         it "ignores an unknown remembered dialect without resetting approval" $
             withTempDir "agent-project-" \root -> do
                 let dir = root </> fromFilePath ".haskell-agent"

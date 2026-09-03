@@ -18,6 +18,7 @@ module Agent.CLI.TUI.Render.Internal
     , fullscreenSurface
     , conversationUiForTarget
     , applyChildConversationUiEvent
+    , mouseCaptureStatus
     , normalizeTextOverlayInsertion
     , maskedSecretText
     , textOverlayDisplayText
@@ -188,7 +189,7 @@ import Agent.CLI.TUI.Render.Overlays
     , drawChoice, drawTextPrompt, drawMetaConsole, choiceRowColumns
     , onboardingVisibleRowIndices
     , normalizeTextOverlayInsertion, maskedSecretText, textOverlayDisplayText
-    , resumeSearchCursorColumn )
+    , resumeSearchCursorColumn, mouseCaptureStatus )
 import Agent.CLI.TUI.Render.Transcript
     ( stickyPromptLayers, quickStartVisible, quickStartWideVisible
     , quickStartRows

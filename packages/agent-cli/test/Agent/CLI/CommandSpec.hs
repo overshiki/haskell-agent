@@ -254,6 +254,13 @@ spec = do
             parseReplLine "/compact focus auth"
                 `shouldBe` ReplCompact (Just "focus auth")
 
+        it "parses /mouse toggle and explicit on/off" do
+            parseReplLine "/mouse" `shouldBe` ReplMouseCapture Nothing
+            parseReplLine "/mouse on" `shouldBe` ReplMouseCapture (Just True)
+            parseReplLine "/mouse off" `shouldBe` ReplMouseCapture (Just False)
+            parseReplLine "/mouse away"
+                `shouldBe` ReplCommandError "usage: /mouse [on|off]"
+
         it "shows account usage without arguments" do
             parseReplLine "/usage" `shouldBe` ReplUsage
             parseReplLine "/usage extra"
@@ -420,6 +427,17 @@ spec = do
             parseReplLine "/bogus"
                 `shouldBe` ReplCommandError "unknown command: /bogus (try /help)"
 
+    describe "nextMouseCapture" do
+        it "flips the current state on a bare toggle" do
+            nextMouseCapture True Nothing `shouldBe` False
+            nextMouseCapture False Nothing `shouldBe` True
+
+        it "prefers an explicit on/off target" do
+            nextMouseCapture True (Just True) `shouldBe` True
+            nextMouseCapture True (Just False) `shouldBe` False
+            nextMouseCapture False (Just True) `shouldBe` True
+            nextMouseCapture False (Just False) `shouldBe` False
+
     describe "parseAfkTarget" do
         it "selects local tmux without an argument" do
             parseAfkTarget Nothing `shouldBe` Right AfkLocal
@@ -486,6 +504,7 @@ spec = do
                     , "copy-path"
                     , "copy-session"
                     , "terminal"
+                    , "mouse"
                     , "agents"
                     , "mcp"
                     , "loop"
@@ -540,7 +559,7 @@ spec = do
                         && "/btw" `elem` xs
                         && "/rewind" `elem` xs
                         && "/undo" `elem` xs)
-            slashCompletionCandidates "" "/mo" `shouldBe` ["/model"]
+            slashCompletionCandidates "" "/mo" `shouldBe` ["/model", "/mouse"]
             slashCompletionCandidates "ledom/" "high" `shouldBe` []
 
         it "completes effort and model arguments" do
@@ -590,7 +609,7 @@ spec = do
                         (("/" <>) . (.slashName))
                         defaultSlashCatalog.slashCatalogCommands
             displays "/mo" 3
-                `shouldBe` ["/model", "/codemod", "/permissions"]
+                `shouldBe` ["/model", "/mouse", "/codemod", "/permissions"]
             displays "/ra" 3 `shouldSatisfy` ("/reload-auth" `elem`)
             displays "look at /mo" 11 `shouldBe` []
 
