@@ -490,10 +490,10 @@ legacySessionSchemaStatements =
       \ LANGUAGE plpgsql\
       \ AS $$ BEGIN RAISE EXCEPTION '%', error_message; END $$"
     , "CREATE TABLE harness.structured_values (\
-      \ value_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()\
+      \ value_id uuid PRIMARY KEY DEFAULT harness.uuidv7()\
       \ )"
     , "CREATE TABLE harness.sessions (\
-      \ session_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ session_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ session_key text NOT NULL UNIQUE,\
       \ created_at timestamptz NOT NULL,\
       \ updated_at timestamptz NOT NULL,\
@@ -510,8 +510,7 @@ serverStatement = Statement.preparable
     "SELECT current_database()::text, current_user::text,\
     \ inet_server_addr() IS NULL,\
     \ to_regclass('harness.sessions') IS NOT NULL,\
-    \ current_setting('server_version_num')::integer >= 180000\
-    \   AND substring(pg_catalog.uuidv7()::text, 15, 1) = '7'"
+    \ substring(harness.uuidv7()::text, 15, 1) = '7'"
     Encoders.noParams
     (Decoders.singleRow $
         (,,,,)

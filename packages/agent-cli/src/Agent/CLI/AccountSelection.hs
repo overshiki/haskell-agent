@@ -61,6 +61,7 @@ providerSupportsUsageAccountSelection = \case
     OpenAIProvider -> True
     XAIProvider -> True
     OpenRouterProvider -> True
+    DeepSeekProvider -> True
     GeminiProvider -> False
     ClaudeCodeProvider -> False
 

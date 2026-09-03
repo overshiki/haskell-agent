@@ -153,7 +153,7 @@ customSchemaStatements =
     , "REVOKE ALL ON SCHEMA harness FROM PUBLIC"
     , "REVOKE CREATE ON SCHEMA public FROM PUBLIC"
     , "CREATE TABLE IF NOT EXISTS harness.custom_scopes (\
-      \ scope_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ scope_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ scope_key text NOT NULL UNIQUE,\
       \ scope_kind text NOT NULL\
       \   CHECK (scope_kind IN ('user', 'repository', 'checkout')),\
@@ -163,7 +163,7 @@ customSchemaStatements =
       \ updated_at timestamptz NOT NULL DEFAULT now()\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.custom_catalog_snapshots (\
-      \ snapshot_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ snapshot_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ scope_id uuid NOT NULL\
       \   REFERENCES harness.custom_scopes(scope_id) ON DELETE CASCADE,\
       \ snapshot_purpose text NOT NULL\
@@ -174,7 +174,7 @@ customSchemaStatements =
       \ ON harness.custom_catalog_snapshots (scope_id)\
       \ WHERE snapshot_purpose = 'current'"
     , "CREATE TABLE IF NOT EXISTS harness.custom_catalog_objects (\
-      \ catalog_object_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ catalog_object_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ snapshot_id uuid NOT NULL\
       \   REFERENCES harness.custom_catalog_snapshots(snapshot_id)\
       \   ON DELETE CASCADE,\
@@ -186,7 +186,7 @@ customSchemaStatements =
       \ UNIQUE (snapshot_id, object_kind, object_name)\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.custom_catalog_columns (\
-      \ catalog_column_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ catalog_column_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ catalog_object_id uuid NOT NULL\
       \   REFERENCES harness.custom_catalog_objects(catalog_object_id)\
       \   ON DELETE CASCADE,\
@@ -202,7 +202,7 @@ customSchemaStatements =
       \ UNIQUE (catalog_object_id, column_name)\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.custom_catalog_constraints (\
-      \ catalog_constraint_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ catalog_constraint_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ catalog_object_id uuid NOT NULL\
       \   REFERENCES harness.custom_catalog_objects(catalog_object_id)\
       \   ON DELETE CASCADE,\
@@ -214,7 +214,7 @@ customSchemaStatements =
       \ UNIQUE (catalog_object_id, constraint_name)\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.custom_catalog_indexes (\
-      \ catalog_index_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ catalog_index_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ catalog_object_id uuid NOT NULL\
       \   REFERENCES harness.custom_catalog_objects(catalog_object_id)\
       \   ON DELETE CASCADE,\
@@ -225,7 +225,7 @@ customSchemaStatements =
       \ UNIQUE (catalog_object_id, index_name)\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.custom_sql_audit (\
-      \ audit_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ audit_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ session_id text,\
       \ agent_id text,\
       \ scope_id uuid NOT NULL\

@@ -21,7 +21,7 @@ import Control.Exception.Safe (bracket, finally)
 import Control.Monad (forM, forM_, void)
 import Data.Functor.Contravariant ((>$<))
 import Data.Int (Int32, Int64)
-import Data.List (sort)
+import Data.List (foldl', sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock (getCurrentTime)
@@ -391,7 +391,7 @@ seedSessionStatement =
         \ FROM harness.sessions\
         \ WHERE session_key = $1 AND deleted_at IS NULL\
         \ ), generated AS (\
-        \ SELECT turn_index, pg_catalog.uuidv7() AS event_id\
+        \ SELECT turn_index, harness.uuidv7() AS event_id\
         \ FROM generate_series(0::bigint, $2 - 1) AS turn_index\
         \ ), inserted_events AS (\
         \ INSERT INTO harness.session_events (\

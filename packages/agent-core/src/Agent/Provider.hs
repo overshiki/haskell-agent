@@ -41,6 +41,7 @@ data Provider
     = OpenAIProvider
     | XAIProvider
     | OpenRouterProvider
+    | DeepSeekProvider
     | GeminiProvider
     | ClaudeCodeProvider
     deriving (Eq, Ord, Show)
@@ -50,6 +51,7 @@ providerSlug = \case
     OpenAIProvider -> "openai"
     XAIProvider -> "xai"
     OpenRouterProvider -> "openrouter"
+    DeepSeekProvider -> "deepseek"
     GeminiProvider -> "gemini"
     ClaudeCodeProvider -> "claude-code"
 
@@ -58,6 +60,7 @@ parseProvider = \case
     "openai" -> Just OpenAIProvider
     "xai" -> Just XAIProvider
     "openrouter" -> Just OpenRouterProvider
+    "deepseek" -> Just DeepSeekProvider
     "gemini" -> Just GeminiProvider
     "google" -> Just GeminiProvider
     "claude-code" -> Just ClaudeCodeProvider

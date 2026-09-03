@@ -76,7 +76,7 @@ import Agent.Store.Types (StoreError(..))
 learnedSkillSchemaStatements :: [ByteString]
 learnedSkillSchemaStatements =
     [ "CREATE TABLE IF NOT EXISTS harness.skills (\
-      \ skill_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ skill_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ scope_kind text NOT NULL\
       \   CHECK (scope_kind IN ('user', 'repository', 'checkout')),\
       \ scope_id uuid NOT NULL,\
@@ -115,7 +115,7 @@ learnedSkillSchemaStatements =
       \ (scope_kind, scope_id, activation_mode, priority DESC, updated_at DESC)\
       \ WHERE status = 'active'"
     , "CREATE TABLE IF NOT EXISTS harness.skill_revisions (\
-      \ skill_revision_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ skill_revision_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ skill_id uuid NOT NULL\
       \   REFERENCES harness.skills(skill_id) ON DELETE RESTRICT,\
       \ revision_number bigint NOT NULL CHECK (revision_number >= 1),\
@@ -137,7 +137,7 @@ learnedSkillSchemaStatements =
       -- Session ids are reserved before the first successful turn is persisted,
       -- so provenance uses a deliberate soft reference instead of a foreign key.
     , "CREATE TABLE IF NOT EXISTS harness.skill_sources (\
-      \ skill_source_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ skill_source_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ skill_revision_id uuid NOT NULL\
       \   REFERENCES harness.skill_revisions(skill_revision_id)\
       \   ON DELETE RESTRICT,\

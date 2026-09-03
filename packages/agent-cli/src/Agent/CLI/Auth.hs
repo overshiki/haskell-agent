@@ -116,6 +116,8 @@ import Agent.Provider
     , withAccountFailureClassifier
     )
 import Agent.OpenRouter.Credential (credentialFromApiKey)
+import qualified Agent.DeepSeek.Credential as DeepSeek
+    ( credentialFromApiKey, credentialFromEnv )
 import qualified Agent.Gemini.Auth as GeminiAuth
 import qualified Agent.Gemini.Credential as GeminiCredential
 import qualified Agent.XAI.Auth as XAIAuth
@@ -198,6 +200,7 @@ loadDetectedSubscriptionProvider =
         [ OpenAIProvider
         , XAIProvider
         , OpenRouterProvider
+        , DeepSeekProvider
         , GeminiProvider
         ]
   where
@@ -229,6 +232,7 @@ loadProvider provider = runExceptT do
         XAIProvider -> loadXai Nothing
         OpenAIProvider -> loadOpenAi
         OpenRouterProvider -> loadOpenRouter Nothing
+        DeepSeekProvider -> loadDeepSeek Nothing
         GeminiProvider -> loadGemini Nothing
         ClaudeCodeProvider -> loadClaudeCode
 
@@ -370,6 +374,7 @@ loadAuthForAccount provider selectionId =
     loadProvider = runExceptT case provider of
         XAIProvider -> loadXai (Just selectionId)
         OpenRouterProvider -> loadOpenRouter (Just selectionId)
+        DeepSeekProvider -> loadDeepSeek (Just selectionId)
         GeminiProvider -> loadGemini (Just selectionId)
         OpenAIProvider ->
             throwE "OpenAI account selection is handled by the live account pool"
@@ -429,6 +434,7 @@ detectProvider Nothing = do
     grok <- lift hasGrokAuth
     openai <- lift hasOpenAiAuth
     openrouter <- lift hasOpenRouterAuth
+    deepseek <- lift hasDeepSeekAuth
     gemini <- lift hasGeminiAuth
     if openai
         then pure OpenAIProvider
@@ -436,9 +442,11 @@ detectProvider Nothing = do
             then pure XAIProvider
             else if openrouter
                 then pure OpenRouterProvider
-                else if gemini
-                    then pure GeminiProvider
-                    else throwE noAuthHint
+                else if deepseek
+                    then pure DeepSeekProvider
+                    else if gemini
+                        then pure GeminiProvider
+                        else throwE noAuthHint
 
 loadXai :: Maybe Text -> ExceptT Text IO LoadedAuth
 loadXai requestedSelectionId = do
@@ -595,6 +603,73 @@ loadOpenRouter requestedSelectionId = do
                 , loadedTokenProvider = provider
                 , loadedAccountLabel = \credential -> do
                     current <- loadOpenRouterCredential (Just selectionId)
+                    let label = case current of
+                            Just (_, currentCredential, currentLabel)
+                                | currentCredential.accountId
+                                    == credential.accountId ->
+                                        currentLabel
+                            _ -> initialLabel
+                    pure (credentialAccountLabelWith label credential)
+                , loadedSelectionId = Just selectionId
+                , loadedOpenAiPool = Nothing
+                }
+
+loadDeepSeekCredential
+    :: Maybe Text
+    -> IO (Maybe (Text, Credential, Text))
+loadDeepSeekCredential requestedSelectionId = do
+    managed <- loadManagedCredential DeepSeekProvider requestedSelectionId
+    case managed of
+        Just (metadata, secret)
+            | metadata.managedAuthKind == ManagedBearerToken ->
+                pure $ Just
+                    ( managedAuthSelectionId metadata.managedId
+                    , (DeepSeek.credentialFromApiKey secret.secretPayload)
+                        { accountId = metadata.managedAccountId }
+                    , metadata.managedLabel
+                    )
+        Just _ -> pure Nothing
+        Nothing -> do
+            external <- fmap
+                (\credential ->
+                    ( externalAuthSelectionId
+                        DeepSeekProvider
+                        "environment"
+                    , credential { accountId = "deepseek" }
+                    , ""
+                    ))
+                <$> DeepSeek.credentialFromEnv
+            pure $ external >>= \candidate@(selectionId, credential, _) ->
+                if matchesSelection
+                    requestedSelectionId
+                    selectionId
+                    credential
+                then Just candidate
+                else Nothing
+
+loadDeepSeek :: Maybe Text -> ExceptT Text IO LoadedAuth
+loadDeepSeek requestedSelectionId = do
+    loadedCredential <- lift (loadDeepSeekCredential requestedSelectionId)
+    case loadedCredential of
+        Nothing ->
+            throwE $
+                maybe noAuthHint
+                    (const
+                        (accountNotFound
+                            DeepSeekProvider requestedSelectionId))
+                    requestedSelectionId
+        Just (selectionId, initial, initialLabel) -> do
+            provider <- lift $ reloadableFileCredentialProvider
+                DeepSeekProvider
+                ApiBilled
+                initial
+                (fmap (\(_, credential, _) -> credential)
+                    <$> loadDeepSeekCredential (Just selectionId))
+            pure LoadedAuth
+                { loadedProvider = DeepSeekProvider
+                , loadedTokenProvider = provider
+                , loadedAccountLabel = \credential -> do
+                    current <- loadDeepSeekCredential (Just selectionId)
                     let label = case current of
                             Just (_, currentCredential, currentLabel)
                                 | currentCredential.accountId
@@ -769,6 +844,12 @@ hasOpenRouterAuth :: IO Bool
 hasOpenRouterAuth = do
     environment <- isJust <$> lookupNonEmpty "OPENROUTER_API_KEY"
     managed <- hasManagedProvider OpenRouterProvider
+    pure (environment || managed)
+
+hasDeepSeekAuth :: IO Bool
+hasDeepSeekAuth = do
+    environment <- isJust <$> lookupNonEmpty "DEEPSEEK_API_KEY"
+    managed <- hasManagedProvider DeepSeekProvider
     pure (environment || managed)
 
 hasGeminiAuth :: IO Bool

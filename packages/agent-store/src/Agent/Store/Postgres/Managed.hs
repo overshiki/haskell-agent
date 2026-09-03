@@ -33,6 +33,7 @@ import qualified System.FileLock as FileLock
 import System.FilePath ((</>))
 import System.Posix.Files (setFileMode)
 import System.Process (readProcessWithExitCode)
+import Text.Read (readMaybe)
 
 import Agent.Store.Postgres.Config
 import Agent.Store.Types
@@ -107,12 +108,13 @@ validateClusterVersion config = do
                     "Could not read managed PostgreSQL version: "
                         <> Text.pack (show exception)
             Right contents
-                | majorVersion contents == "18" -> pure (Right ())
+                | majorVersionAtLeast (majorVersion contents) 14 ->
+                    pure (Right ())
                 | otherwise ->
                     pure $ Left $ StoreConfigurationError $
-                        "Managed PostgreSQL requires major version 18, but "
-                            <> "the existing data directory was initialized by "
-                            <> "PostgreSQL "
+                        "Managed PostgreSQL requires major version 14 or newer, "
+                            <> "but the existing data directory was initialized "
+                            <> "by PostgreSQL "
                             <> Text.pack
                                 (ByteString.Char8.unpack
                                     (majorVersion contents))
@@ -122,6 +124,11 @@ validateClusterVersion config = do
     majorVersion =
         ByteString.Char8.takeWhile
             (\char -> char /= '\n' && char /= '\r' && char /= ' ')
+    majorVersionAtLeast :: ByteString.Char8.ByteString -> Int -> Bool
+    majorVersionAtLeast version minimumVersion =
+        case readMaybe (ByteString.Char8.unpack version) of
+            Just major -> major >= minimumVersion
+            Nothing -> False
 
 stopManagedPostgres
     :: ManagedPostgresConfig

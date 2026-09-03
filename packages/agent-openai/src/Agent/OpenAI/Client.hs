@@ -245,6 +245,9 @@ createCodexMessageWithProviderAtWithOptionsInternal options turnState
             OpenRouterProvider -> pure $ Left $ ProviderError ApiErrorType
                 "OpenRouter credentials must be used through agent-openrouter"
                 Nothing
+            DeepSeekProvider -> pure $ Left $ ProviderError ApiErrorType
+                "DeepSeek credentials must be used through agent-deepseek"
+                Nothing
             GeminiProvider -> pure $ Left $ ProviderError ApiErrorType
                 "Gemini credentials must be used through agent-gemini"
                 Nothing

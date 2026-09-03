@@ -90,6 +90,8 @@ import Agent.Provider
     )
 import qualified Agent.OpenRouter.Client as OpenRouter
 import qualified Agent.OpenRouter.Options as OpenRouter
+import qualified Agent.DeepSeek.Client as DeepSeek
+import qualified Agent.DeepSeek.Options as DeepSeek
 import qualified Agent.XAI.Client as XAI
 import qualified Agent.XAI.Options as XAI
 import Control.Monad.Trans.Class (lift)
@@ -197,6 +199,21 @@ runProviderCompactWithContextWindow contextWindow openAiSender recordUsage
                         (\request ->
                             runWithTokenProvider tokens \credential ->
                                 OpenRouter.createResponseWith
+                                    options credential request)
+                        params
+                        history
+                        focus
+        DeepSeekProvider ->
+            case tokenProvider of
+                Nothing ->
+                    pure (compactTextFailure
+                        "deepseek compact requires a token provider")
+                Just tokens -> do
+                    options <- DeepSeek.clientOptionsFromEnv
+                    summarizeTextAttempt
+                        (\request ->
+                            runWithTokenProvider tokens \credential ->
+                                DeepSeek.createResponseWith
                                     options credential request)
                         params
                         history

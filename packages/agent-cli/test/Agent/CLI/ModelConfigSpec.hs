@@ -37,6 +37,9 @@ spec = describe "Agent.CLI.ModelConfig" do
         fmap (.catalogModelId)
             (catalogDefaultForProvider catalog OpenRouterProvider)
             `shouldBe` Just "stealth/ox-alpha"
+        fmap (.catalogModelId)
+            (catalogDefaultForProvider catalog DeepSeekProvider)
+            `shouldBe` Just "deepseek-v4-flash"
         catalogContextWindowFor catalog "xai" "grok-4.6"
             `shouldBe` Just 500_000
         map (catalogContextWindowFor catalog "gemini")
@@ -46,6 +49,8 @@ spec = describe "Agent.CLI.ModelConfig" do
             ]
             `shouldBe` replicate 3 (Just 1_048_576)
         catalogContextWindowFor catalog "openrouter" "stealth/ox-alpha"
+            `shouldBe` Just 1_048_576
+        catalogContextWindowFor catalog "deepseek" "deepseek-v4-flash"
             `shouldBe` Just 1_048_576
         fmap (.catalogModelId)
             (catalogModelsForConnection "openai" catalog)

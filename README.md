@@ -380,6 +380,29 @@ From the development shell, `repl` opens the agent under GHCi. Edit the
 harness, leave the running agent, reload the changed modules, and resume the
 same session without rebuilding the executable.
 
+### Pure Cabal (without Nix)
+
+You can also build with plain `cabal`. Run `scripts/setup-cabal-build.sh` once
+to fetch the patched `vty-unix`, syntax definitions, and bundled model data,
+then build the CLI:
+
+```console
+scripts/setup-cabal-build.sh
+cabal build agent-cli:exe:agent-cli
+```
+
+The CLI needs PostgreSQL 14 or newer, with the PostgreSQL tools (`initdb`,
+`pg_ctl`, `psql`) on `PATH`. Older servers are supported through a
+`pgcrypto`-based UUIDv7 fallback, so `pg_catalog.uuidv7()` (PostgreSQL 18+) is
+not required. If the tools are installed outside the default `PATH` (for
+example in `/usr/lib/postgresql/14/bin`), set `AGENT_POSTGRES_BIN` before
+running:
+
+```console
+export AGENT_POSTGRES_BIN=/usr/lib/postgresql/14/bin
+cabal run agent-cli:exe:agent-cli
+```
+
 See [`AGENTS.md`](AGENTS.md) for the complete development workflow, including
 multi-package GHCi sessions, Nix package maintenance, and CLI testing.
 

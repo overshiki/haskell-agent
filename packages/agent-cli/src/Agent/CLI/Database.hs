@@ -141,7 +141,7 @@ executeTool env = jsonTool
         <> "memory such as todos and to insert, update, or delete its rows. "
         <> "Choose the narrowest correct scope, prefer existing suitable "
         <> "tables, and add UUIDv7 primary keys using "
-        <> "`uuid PRIMARY KEY DEFAULT uuidv7()`, timestamps, constraints, "
+        <> "`uuid PRIMARY KEY DEFAULT harness.uuidv7()`, timestamps, constraints, "
         <> "indexes, and comments when creating a schema. This is a mutating tool and "
         <> "requires approval unless the active policy auto-approves it."
     )

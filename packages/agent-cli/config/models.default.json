@@ -17,6 +17,10 @@
       "api": "builtin",
       "provider": "openrouter"
     },
+    "deepseek": {
+      "api": "builtin",
+      "provider": "deepseek"
+    },
     "meta": {
       "api": "responses",
       "base_url": "https://api.meta.ai/v1",
@@ -97,6 +101,29 @@
       "dialect": "generic-responses",
       "context_window": 1048576,
       "label": "reasoning · agentic · 1M context"
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "connection": "deepseek",
+      "dialect": "generic-responses",
+      "context_window": 1048576,
+      "label": "default · reasoning · 1M context",
+      "default": true,
+      "fallback_priority": 20
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "connection": "deepseek",
+      "dialect": "generic-responses",
+      "context_window": 1048576,
+      "label": "reasoning · 1M context"
+    },
+    {
+      "id": "deepseek-v4-flash-vision-exp",
+      "connection": "deepseek",
+      "dialect": "generic-responses",
+      "context_window": 1048576,
+      "label": "vision · 1M context"
     },
     {
       "id": "muse-spark-1.2",

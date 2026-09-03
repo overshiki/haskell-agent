@@ -296,6 +296,7 @@ parseMetaProvider raw =
         "grok" -> Just XAIProvider
         "openrouter" -> Just OpenRouterProvider
         "open-router" -> Just OpenRouterProvider
+        "deepseek" -> Just DeepSeekProvider
         "claude" -> Just ClaudeCodeProvider
         "claude-code" -> Just ClaudeCodeProvider
         _ -> Nothing

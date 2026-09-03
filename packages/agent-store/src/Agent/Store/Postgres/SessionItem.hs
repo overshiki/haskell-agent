@@ -23,7 +23,7 @@ import Agent.Store.Postgres.SessionItem.Write (insertResponseItems)
 sessionItemSchemaStatements :: [ByteString.ByteString]
 sessionItemSchemaStatements =
     [ "CREATE TABLE IF NOT EXISTS harness.session_response_items (\
-      \ response_item_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ response_item_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ turn_id uuid NOT NULL REFERENCES harness.session_turns(turn_id)\
       \   ON DELETE CASCADE,\
       \ item_index integer NOT NULL CHECK (item_index >= 0),\
@@ -114,7 +114,7 @@ sessionItemSchemaStatements =
       \ extra_fields_text text NOT NULL DEFAULT '{}'\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.session_reasoning_summaries (\
-      \ summary_part_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ summary_part_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ response_item_id uuid NOT NULL REFERENCES\
       \   harness.session_reasoning_items(response_item_id) ON DELETE CASCADE,\
       \ part_index integer NOT NULL CHECK (part_index >= 0),\
@@ -136,7 +136,7 @@ sessionItemSchemaStatements =
       \ fields_text text NOT NULL DEFAULT '{}'\
       \ )"
     , "CREATE TABLE IF NOT EXISTS harness.session_response_content_parts (\
-      \ content_part_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ content_part_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ response_item_id uuid NOT NULL REFERENCES\
       \   harness.session_response_items(response_item_id) ON DELETE CASCADE,\
       \ part_index integer NOT NULL CHECK (part_index >= 0),\

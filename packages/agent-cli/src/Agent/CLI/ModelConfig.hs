@@ -571,7 +571,7 @@ ensureUniqueModelIds source models =
 
 allBuiltinProviders :: [Provider]
 allBuiltinProviders =
-    [OpenAIProvider, XAIProvider, OpenRouterProvider, GeminiProvider]
+    [OpenAIProvider, XAIProvider, OpenRouterProvider, DeepSeekProvider, GeminiProvider]
 
 nonEmptyText :: Text -> Maybe Text
 nonEmptyText value

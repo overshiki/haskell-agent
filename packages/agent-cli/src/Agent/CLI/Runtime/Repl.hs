@@ -113,7 +113,8 @@ import Agent.CLI.Terminal
 import Agent.CLI.Tools ()
 import Agent.CLI.Turn ()
 import Agent.CLI.Usage
-    ( formatGrokLimitStatus,
+    ( formatDeepSeekLimitStatus,
+      formatGrokLimitStatus,
       formatOpenAiLimitStatus,
       formatOpenRouterLimitStatus )
 import Agent.CLI.WebFetch ()
@@ -132,7 +133,8 @@ import Agent.OpenAI.WebSocketClient ()
 import Agent.OpenRouter.LoopBackend ()
 import Agent.OsPath ()
 import Agent.Provider
-    ( Provider(OpenRouterProvider, XAIProvider, OpenAIProvider),
+    ( Provider(OpenRouterProvider, XAIProvider, OpenAIProvider,
+               DeepSeekProvider),
       Credential(accessToken, accountId),
       getNextToken,
       tokenProviderBillingMode,
@@ -186,6 +188,8 @@ import qualified Agent.OpenAI.Auth as OpenAI ()
 import qualified Agent.OpenRouter as OpenRouter ()
 import qualified Agent.OpenRouter.Usage as OpenRouterUsage
     ( fetchOpenRouterUsage )
+import qualified Agent.DeepSeek.Usage as DeepSeekUsage
+    ( fetchDeepSeekUsage )
 import qualified Agent.Provider as Provider ()
 import qualified Agent.CLI.Session.Lifecycle as SessionLifecycle
     ( finishTurn, retryFailedTurn, runPendingTurn )
@@ -422,6 +426,16 @@ replWithDraft env@SessionEnv
                                 Right snapshot ->
                                     publish
                                         (formatOpenRouterLimitStatus snapshot)
+            (DeepSeekProvider, Just tokens) ->
+                getNextToken tokens Nothing >>= \case
+                    Left _ -> pure ()
+                    Right credential ->
+                        DeepSeekUsage.fetchDeepSeekUsage
+                            credential.accessToken >>= \case
+                                Left _ -> pure ()
+                                Right snapshot ->
+                                    publish
+                                        (formatDeepSeekLimitStatus snapshot)
             _ -> pure ()
       where
         refreshWith tokens fetch formatStatus =

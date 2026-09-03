@@ -37,6 +37,8 @@ spec = describe "Agent.Dialect" do
                 `shouldBe` GrokBuildDialect
             dialectIdForModel GeminiProvider "arbitrary-model"
                 `shouldBe` GenericResponsesDialect
+            dialectIdForModel DeepSeekProvider "arbitrary-model"
+                `shouldBe` GenericResponsesDialect
             dialectIdForModel ClaudeCodeProvider "arbitrary-model"
                 `shouldBe` ClaudeCodeDialect
 
@@ -66,6 +68,8 @@ spec = describe "Agent.Dialect" do
                 `shouldBe` GrokBuildDialect
             legacyDialectIdForProvider GeminiProvider
                 `shouldBe` GenericResponsesDialect
+            legacyDialectIdForProvider DeepSeekProvider
+                `shouldBe` GenericResponsesDialect
             legacyDialectIdForProvider ClaudeCodeProvider
                 `shouldBe` ClaudeCodeDialect
 
@@ -82,6 +86,10 @@ spec = describe "Agent.Dialect" do
             providerSupportsDialect GeminiProvider GenericResponsesDialect
                 `shouldBe` True
             providerSupportsDialect GeminiProvider CodexDialect
+                `shouldBe` False
+            providerSupportsDialect DeepSeekProvider GenericResponsesDialect
+                `shouldBe` True
+            providerSupportsDialect DeepSeekProvider CodexDialect
                 `shouldBe` False
             providerSupportsDialect ClaudeCodeProvider ClaudeCodeDialect
                 `shouldBe` True

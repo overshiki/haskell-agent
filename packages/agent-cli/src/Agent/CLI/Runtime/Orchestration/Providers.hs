@@ -167,7 +167,7 @@ import Agent.OpenRouter.Options (ClientOptions)
 import Agent.OsPath (unsafeToFilePath)
 import Agent.Provider
     ( Provider(OpenRouterProvider, OpenAIProvider, XAIProvider,
-               GeminiProvider, ClaudeCodeProvider),
+               GeminiProvider, ClaudeCodeProvider, DeepSeekProvider),
       Credential(accountId, Credential, accessToken, leaseId, provider),
       TokenProvider,
       runWithTokenProvider,
@@ -246,6 +246,11 @@ import qualified Agent.XAI.Usage as XAIUsage ()
 import qualified Agent.Gemini.Client as GeminiClient
     ( createResponseWith, createResponseWithEvents )
 import qualified Agent.Gemini.Options as Gemini
+    ( clientOptionsFromEnv )
+import Agent.DeepSeek.LoopBackend ( deepSeekBackend )
+import qualified Agent.DeepSeek.Client as DeepSeekClient
+    ( createResponseWith )
+import qualified Agent.DeepSeek.Options as DeepSeek
     ( clientOptionsFromEnv )
 
 runAgentProviders
@@ -1097,6 +1102,85 @@ runAgentProviders
                                 loaded.loadedOpenAiPool
                                 (Just selectHttpAccount)
                                 (Just . openRouterContextWindow
+                                    <$> readIORef paramsRef)
+                                compactRunner)
+                            SessionBackend
+                                { backend = activeBackend
+                                , btwBackend
+                                , interruptBackend = pure ()
+                                , resetBackendState = pure ()
+                                }
+                    DeepSeekProvider -> do
+                        deepSeekOptions <- DeepSeek.clientOptionsFromEnv
+                        deepSeekOccupancy <- newIORef Nothing
+                        let deepSeekContextWindow =
+                                contextWindowForParams id 1_048_576
+                            makeBackend getParams =
+                                deepSeekBackend
+                                    deepSeekOptions
+                                    tokenProvider
+                                    getParams
+                            protectDeepSeekOverflow occupancy getParams backend =
+                                boundCompletedToolContinuations
+                                    deepSeekContextWindow
+                                    getParams
+                                    occupancy
+                                    backend
+                        case multiCtx of
+                            Just ctx ->
+                                setSubagentRunner ctx.multiRegistry $
+                                    runHttpSubagent
+                                        subagentRuntime
+                                        dialect
+                                        DeepSeekProvider
+                                        ctx.multiSendToRoot
+                                        (\childParams ->
+                                            protectDeepSeekOverflow
+                                                deepSeekOccupancy
+                                                (pure childParams)
+                                                (makeBackend
+                                                    (pure childParams)))
+                            Nothing -> pure ()
+                        let backend =
+                                withPendingInputs pendingNotices $
+                                    withConnectionRecovery $
+                                        protectDeepSeekOverflow
+                                            deepSeekOccupancy
+                                            (readIORef paramsRef)
+                                            (makeBackend
+                                                (readIORef paramsRef))
+                            btwBackend privateParams =
+                                makeBackend (pure privateParams)
+                            compactRunner focus = do
+                                contextWindow <-
+                                    currentModelContextWindow id
+                                historyRef <-
+                                    newIORef =<< readLiveTranscript conversationRef
+                                installLiveCompactOutcome conversationRef Nothing
+                                    (runResponsesCompactWithContextWindow
+                                        contextWindow
+                                        (\request ->
+                                            runWithTokenProvider tokenProvider
+                                                \credential ->
+                                                    DeepSeekClient.createResponseWith
+                                                        deepSeekOptions
+                                                        credential
+                                                        request)
+                                        recordCompactionUsage
+                                        paramsRef
+                                        historyRef)
+                                    focus
+                        activeBackend <-
+                            prepareTransitionBackend
+                                modelSwitchScope home projectRoot
+                                transition persist backend
+                        runSession
+                            (sessionRequest
+                                startupUnavailable
+                                (Just tokenProvider)
+                                loaded.loadedOpenAiPool
+                                (Just selectHttpAccount)
+                                (Just . deepSeekContextWindow
                                     <$> readIORef paramsRef)
                                 compactRunner)
                             SessionBackend

@@ -58,10 +58,10 @@ spec = describe "custom PostgreSQL scopes" do
         let migrationSql = ByteString.unlines customSchemaStatements
         migrationSql `shouldSatisfy`
             ByteString.isInfixOf
-                "scope_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()"
+                "scope_id uuid PRIMARY KEY DEFAULT harness.uuidv7()"
         migrationSql `shouldSatisfy`
             ByteString.isInfixOf
-                "audit_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7()"
+                "audit_id uuid PRIMARY KEY DEFAULT harness.uuidv7()"
         migrationSql `shouldSatisfy`
             (not . ByteString.isInfixOf " jsonb")
         migrationSql `shouldSatisfy`

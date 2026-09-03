@@ -543,9 +543,10 @@ runMigrations pool migrations =
                     \ END $$"
                 Transaction.sql
                     "CREATE SCHEMA IF NOT EXISTS harness"
+                forM_ uuidv7FunctionStatements Transaction.sql
                 Transaction.sql
                     "CREATE TABLE IF NOT EXISTS harness.schema_migrations (\
-                    \ migration_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+                    \ migration_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
                     \ version bigint NOT NULL UNIQUE,\
                     \ name text NOT NULL,\
                     \ applied_at timestamptz NOT NULL DEFAULT now()\
@@ -600,6 +601,43 @@ verifyNames applied =
 hasDuplicates :: Ord a => [a] -> Bool
 hasDuplicates values =
     length values /= Map.size (Map.fromList (fmap (\value -> (value, ())) values))
+
+-- PostgreSQL 18 provides pg_catalog.uuidv7(), but harness-managed clusters may
+-- run on older PostgreSQL releases.  Keep identifier generation server-side,
+-- but provide a compatible RFC 9562 UUIDv7 fallback through pgcrypto.
+uuidv7FunctionStatements :: [ByteString]
+uuidv7FunctionStatements =
+    [ "CREATE EXTENSION IF NOT EXISTS pgcrypto"
+    , "CREATE OR REPLACE FUNCTION harness.uuidv7() RETURNS uuid\
+      \ LANGUAGE plpgsql\
+      \ VOLATILE\
+      \ AS $ha_uuidv7$\
+      \ DECLARE\
+      \   ts_ms bigint;\
+      \   random_bytes bytea := public.gen_random_bytes(10);\
+      \   bytes bytea := '\\x00000000000000000000000000000000'::bytea;\
+      \ BEGIN\
+      \   ts_ms := floor(extract(epoch from clock_timestamp()) * 1000)::bigint;\
+      \   bytes := set_byte(bytes, 0, ((ts_ms >> 40) & 255)::int);\
+      \   bytes := set_byte(bytes, 1, ((ts_ms >> 32) & 255)::int);\
+      \   bytes := set_byte(bytes, 2, ((ts_ms >> 24) & 255)::int);\
+      \   bytes := set_byte(bytes, 3, ((ts_ms >> 16) & 255)::int);\
+      \   bytes := set_byte(bytes, 4, ((ts_ms >> 8) & 255)::int);\
+      \   bytes := set_byte(bytes, 5, (ts_ms & 255)::int);\
+      \   bytes := set_byte(bytes, 6, (get_byte(random_bytes, 0) & 15) | 112);\
+      \   bytes := set_byte(bytes, 7, get_byte(random_bytes, 1));\
+      \   bytes := set_byte(bytes, 8, (get_byte(random_bytes, 2) & 63) | 128);\
+      \   bytes := set_byte(bytes, 9, get_byte(random_bytes, 3));\
+      \   bytes := set_byte(bytes, 10, get_byte(random_bytes, 4));\
+      \   bytes := set_byte(bytes, 11, get_byte(random_bytes, 5));\
+      \   bytes := set_byte(bytes, 12, get_byte(random_bytes, 6));\
+      \   bytes := set_byte(bytes, 13, get_byte(random_bytes, 7));\
+      \   bytes := set_byte(bytes, 14, get_byte(random_bytes, 8));\
+      \   bytes := set_byte(bytes, 15, get_byte(random_bytes, 9));\
+      \   RETURN encode(bytes, 'hex')::uuid;\
+      \ END\
+      \ $ha_uuidv7$"
+    ]
 
 appliedMigrationsStatement :: Statement () [(Int64, Text)]
 appliedMigrationsStatement = mkStatement

@@ -194,6 +194,9 @@ runCredentialOnboarding startup runtime = do
         , ( OpenRouterProvider
           , ("Add an OpenRouter API key", "Use API credits")
           )
+        , ( DeepSeekProvider
+          , ("Add a DeepSeek API key", "Use API credits")
+          )
         , ( GeminiProvider
           , ("Sign in with Google", "Use Gemini with your Google account")
           )

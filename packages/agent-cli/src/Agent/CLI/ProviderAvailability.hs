@@ -16,6 +16,7 @@ module Agent.CLI.ProviderAvailability
 
 import Agent.CLI.Auth (LoadedAuth(..))
 import Agent.Error (ApiError(..), ErrorType(..))
+import qualified Agent.DeepSeek.Usage as DeepSeek
 import qualified Agent.OpenAI.Usage as OpenAI
 import qualified Agent.OpenRouter.Usage as OpenRouter
 import Agent.Provider
@@ -63,6 +64,12 @@ probeLoadedAvailability loaded =
             OpenRouter.fetchOpenRouterUsage credential.accessToken >>= \case
                 Left _ -> pure Nothing
                 Right snapshot -> pure (openRouterUsageFailure snapshot)
+        -- DeepSeek's balance endpoint has no exhaustion signal yet; a
+        -- successful read only confirms the key stays usable.
+        DeepSeekProvider ->
+            DeepSeek.fetchDeepSeekUsage credential.accessToken >>= \case
+                Left _ -> pure Nothing
+                Right _ -> pure Nothing
         _ -> pure Nothing
 
 -- | Automatic fallback must not send a model request merely because the Grok

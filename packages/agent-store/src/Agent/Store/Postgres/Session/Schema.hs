@@ -15,7 +15,7 @@ import Agent.Store.Postgres.SessionItem
 sessionSchemaStatements :: [ByteString]
 sessionSchemaStatements =
     [ "CREATE TABLE IF NOT EXISTS harness.sessions (\
-      \ session_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ session_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ session_key text NOT NULL UNIQUE,\
       \ session_schema_version integer NOT NULL CHECK (session_schema_version > 0),\
       \ created_at timestamptz NOT NULL,\
@@ -68,7 +68,7 @@ sessionSchemaStatements =
       \ ON harness.sessions (updated_at DESC)\
       \ WHERE deleted_at IS NULL"
     , "CREATE TABLE IF NOT EXISTS harness.session_events (\
-      \ event_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ event_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ session_id uuid NOT NULL\
       \   REFERENCES harness.sessions(session_id),\
       \ sequence bigint NOT NULL,\
@@ -79,7 +79,7 @@ sessionSchemaStatements =
     , "CREATE INDEX IF NOT EXISTS session_events_session_time_idx\
       \ ON harness.session_events (session_id, occurred_at DESC)"
     , "CREATE TABLE IF NOT EXISTS harness.session_turns (\
-      \ turn_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+      \ turn_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
       \ session_id uuid NOT NULL\
       \   REFERENCES harness.sessions(session_id),\
       \ event_id uuid NOT NULL UNIQUE\
@@ -128,7 +128,7 @@ sessionSchemaStatements =
     <> sessionSearchIndexStatements
     <> sessionItemSchemaStatements
     <> [ "CREATE TABLE IF NOT EXISTS harness.legacy_session_imports (\
-       \ import_id uuid PRIMARY KEY DEFAULT pg_catalog.uuidv7(),\
+       \ import_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\
        \ source_path text NOT NULL,\
        \ content_hash text NOT NULL,\
        \ session_id uuid NOT NULL REFERENCES harness.sessions(session_id),\

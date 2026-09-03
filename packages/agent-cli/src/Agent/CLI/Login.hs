@@ -116,6 +116,7 @@ import qualified Agent.OpenAI.Login as OpenAILogin
 import Agent.OsPath (toText, unsafeToFilePath)
 import qualified Agent.OpenAI.Usage as OpenAI
 import qualified Agent.OpenRouter.Usage as OpenRouter
+import qualified Agent.DeepSeek.Usage as DeepSeek
 import qualified Agent.Gemini.Auth as GeminiAuth
 import Agent.Provider
     ( BillingMode(..)
@@ -448,7 +449,7 @@ loginDashboardEntries
 loginDashboardEntries accounts =
     [ ( LoginDashboardConnect
       , ( "＋ Connect account"
-        , "OpenAI, xAI / Grok, OpenRouter, Google Gemini, or Claude Code"
+        , "OpenAI, xAI / Grok, OpenRouter, DeepSeek, Google Gemini, or Claude Code"
         )
       )
     , ( LoginDashboardGateway
@@ -1142,6 +1143,7 @@ discoverLoginAccountSources = do
     grokFile <- discoverGrokFile
         (home </> unsafeEncodeUtf ".grok" </> unsafeEncodeUtf "auth.json")
     openRouter <- discoverOpenRouter
+    deepseek <- discoverDeepSeek
     gemini <- discoverGemini
     managed <- loadManagedCredentials
     gateway <- loadGatewayLoginAccount
@@ -1156,6 +1158,7 @@ discoverLoginAccountSources = do
                 , grokEnv
                 , grokFile
                 , openRouter
+                , deepseek
                 , gemini
                 ]
 
@@ -1223,6 +1226,7 @@ managedLoginAccount now (metadata, secret) =
             ManagedOpenAIAuthJson -> Nothing
             ManagedGeminiAuthJson -> Nothing
         OpenRouterProvider -> Nothing
+        DeepSeekProvider -> Nothing
         GeminiProvider -> case metadata.managedAuthKind of
             ManagedGeminiAuthJson ->
                 (.email) <$> geminiAuth
@@ -1426,6 +1430,7 @@ connectProviderAccount color = \case
     OpenAIProvider -> connectOpenAI color
     XAIProvider -> connectXAI color
     OpenRouterProvider -> connectOpenRouter color
+    DeepSeekProvider -> connectDeepSeek color
     GeminiProvider -> connectGemini color
     ClaudeCodeProvider -> do
         printLoginMessage color False
@@ -1440,6 +1445,7 @@ pickConnectProvider color =
         [ OpenAIProvider
         , XAIProvider
         , OpenRouterProvider
+        , DeepSeekProvider
         , GeminiProvider
         , ClaudeCodeProvider
         ]
@@ -1489,6 +1495,9 @@ connectFullscreenAccount runtime = do
         , ( OpenRouterProvider
           , ("OpenRouter", "Add a masked API key and inspect credits")
           )
+        , ( DeepSeekProvider
+          , ("DeepSeek", "Add a masked API key and inspect credits")
+          )
         , ( GeminiProvider
           , ("Google Gemini", "Connect a Google account with OAuth")
           )
@@ -1505,6 +1514,7 @@ connectFullscreenProvider runtime = \case
     OpenAIProvider -> connectOpenAIFullscreen runtime
     XAIProvider -> connectXAIFullscreen runtime
     OpenRouterProvider -> connectOpenRouterFullscreen runtime
+    DeepSeekProvider -> connectDeepSeekFullscreen runtime
     GeminiProvider -> connectGeminiFullscreen runtime
     ClaudeCodeProvider ->
         pure $
@@ -1793,6 +1803,44 @@ connectOpenRouterFullscreen runtime =
               where
                 apiKey = Text.strip rawKey
 
+connectDeepSeekFullscreen
+    :: FullscreenRuntime
+    -> IO (Maybe (Either Text Text))
+connectDeepSeekFullscreen runtime =
+    requestFullscreenSecret
+        runtime
+        "Connect DeepSeek"
+        ( "Paste a DeepSeek API key. Input is masked and is never added "
+            <> "to the conversation transcript."
+        )
+        >>= \case
+            Nothing -> pure Nothing
+            Just rawKey
+                | Text.null apiKey -> pure Nothing
+                | otherwise -> do
+                    fetched <-
+                        withLoginProgress runtime "Validating DeepSeek key…" $
+                            DeepSeek.fetchDeepSeekUsage apiKey
+                    case fetched of
+                        Left err ->
+                            pure $
+                                Just $
+                                    Left ("DeepSeek rejected the key: " <> err)
+                        Right usage -> do
+                            let accountId =
+                                    fromMaybe "deepseek" usage.keyLabel
+                                label =
+                                    fromMaybe "DeepSeek" usage.keyLabel
+                            Just <$> storeConnectedCredentialResult
+                                DeepSeekProvider
+                                accountId
+                                label
+                                ApiBilled
+                                ManagedBearerToken
+                                apiKey
+              where
+                apiKey = Text.strip rawKey
+
 connectGeminiFullscreen
     :: FullscreenRuntime
     -> IO (Maybe (Either Text Text))
@@ -2011,6 +2059,34 @@ connectOpenRouter color =
                             fromMaybe "OpenRouter" usage.keyLabel
                     storeConnectedCredential color
                         OpenRouterProvider
+                        accountId
+                        label
+                        ApiBilled
+                        ManagedBearerToken
+                        apiKey
+                        >>= \stored ->
+                            pure $
+                                if stored
+                                    then Just accountId
+                                    else Nothing
+
+connectDeepSeek :: Bool -> IO (Maybe Text)
+connectDeepSeek color =
+    readSecretLine "DeepSeek API key: " >>= \case
+        Nothing -> pure Nothing
+        Just apiKey ->
+            DeepSeek.fetchDeepSeekUsage apiKey >>= \case
+                Left err ->
+                    printLoginMessage color False
+                        ("DeepSeek rejected the key: " <> err)
+                        >> pure Nothing
+                Right usage -> do
+                    let accountId =
+                            fromMaybe "deepseek" usage.keyLabel
+                        label =
+                            fromMaybe "DeepSeek" usage.keyLabel
+                    storeConnectedCredential color
+                        DeepSeekProvider
                         accountId
                         label
                         ApiBilled
@@ -2256,6 +2332,25 @@ discoverOpenRouter = do
             , loginEnabled = True
             }
 
+discoverDeepSeek :: IO (Maybe LoginAccount)
+discoverDeepSeek = do
+    token <- lookupNonEmpty "DEEPSEEK_API_KEY"
+    pure $ do
+        accessToken <- token
+        pure LoginAccount
+            { loginManagedId = Nothing
+            , loginProvider = DeepSeekProvider
+            , loginAccountId = "deepseek"
+            , loginLabel = "DeepSeek"
+            , loginBilling = ApiCreditsBilling
+            , loginSource = "environment"
+            , loginUsage = UsageNotChecked
+            , loginAccessToken = accessToken
+            , loginAuthKind = ManagedBearerToken
+            , loginSecretPayload = accessToken
+            , loginEnabled = True
+            }
+
 discoverGemini :: IO (Maybe LoginAccount)
 discoverGemini = do
     googleKey <- lookupNonEmpty "GOOGLE_API_KEY"
@@ -2444,6 +2539,23 @@ refreshLoginAccount account
                                     formatAmount
                                         (snapshot.totalUsage
                                             <|> snapshot.keyUsage)
+                                }
+                        }
+        DeepSeekProvider ->
+            DeepSeek.fetchDeepSeekUsage account.loginAccessToken >>= \case
+                Left err ->
+                    pure account
+                        { loginUsage = UsageUnavailable err }
+                Right snapshot ->
+                    pure account
+                        { loginLabel =
+                            fromMaybe account.loginLabel snapshot.keyLabel
+                        , loginUsage =
+                            UsageAvailable AccountUsage
+                                { usagePlan = Nothing
+                                , usageWindows = []
+                                , creditsRemaining = snapshot.totalBalance
+                                , creditsUsed = Nothing
                                 }
                         }
         GeminiProvider ->

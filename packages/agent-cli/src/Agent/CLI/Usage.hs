@@ -2,6 +2,7 @@
 module Agent.CLI.Usage
     ( AccountUsageLine(..)
     , formatAccountUsage
+    , formatDeepSeekLimitStatus
     , formatDuration
     , formatGrokLimitStatus
     , formatOpenAiLimitStatus
@@ -15,17 +16,20 @@ module Agent.CLI.Usage
 import Agent.CLI.Duration (formatDuration)
 import Agent.CLI.Error (formatApiErrorInlineAt)
 import Agent.CLI.Style (roleMuted, roleSuccess, roleWarn)
+import Agent.DeepSeek.Usage (DeepSeekUsage(..))
 import Agent.Error (ApiError)
 import Agent.OpenAI.Usage (UsageLimit(..), UsageSnapshot(..), UsageWindow(..))
 import Agent.OpenRouter.Usage (OpenRouterUsage(..))
 import Agent.TUI.Model (PromptLimitStatus(..))
 import Agent.XAI.Usage (GrokUsageSnapshot, weeklyLimitLeft)
 import Control.Applicative ((<|>))
+import Data.Scientific (Scientific)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Calendar (fromGregorian)
 import Data.Time.Clock (UTCTime(..), addUTCTime, diffUTCTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
+import Text.Read (readMaybe)
 
 data AccountUsageLine = AccountUsageLine
     { usageAccountId :: !Text
@@ -72,6 +76,14 @@ formatOpenRouterLimitStatus usage =
                 | credits <= 0 = remaining <= 0
                 | otherwise = remainingPercent remaining credits <= 10
         pure (amountLimitStatus "Credits left" remaining warning)
+
+-- | DeepSeek reports balance amounts as pre-formatted decimal strings.
+formatDeepSeekLimitStatus :: DeepSeekUsage -> Maybe PromptLimitStatus
+formatDeepSeekLimitStatus usage = do
+    balance <- usage.totalBalance
+    amount <- readMaybe (Text.unpack balance)
+    let remaining = max 0 (amount :: Scientific)
+    pure (amountLimitStatus "Balance left" remaining (remaining <= 0))
 
 percentLimitStatus :: Text -> Int -> PromptLimitStatus
 percentLimitStatus label remaining =

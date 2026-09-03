@@ -38,7 +38,7 @@ spec = describe "PostgreSQL session schema" do
 
     it "uses typed session, turn, tool-call, and tool-output tables" do
         let ddl = ByteString.intercalate "\n" sessionSchemaStatements
-        ddl `shouldContainBytes` "DEFAULT pg_catalog.uuidv7()"
+        ddl `shouldContainBytes` "DEFAULT harness.uuidv7()"
         ddl `shouldNotContainBytes` "CREATE OR REPLACE FUNCTION harness.uuid_v7()"
         ddl `shouldNotContainBytes` "harness.structured_values"
         ddl `shouldContainBytes` "CREATE TABLE IF NOT EXISTS harness.sessions"
