@@ -1,4 +1,4 @@
--- | Command-line flags for @agent-cli@.
+-- | Command-line flags for @monad-cli@.
 module Agent.CLI.Options
     ( ApprovalAnswer(..)
     , ApprovalPolicy(..)
@@ -34,6 +34,7 @@ import qualified Agent.ReasoningEffort as ReasoningEffort
 import Agent.TUI.Motion (MotionMode(..))
 import Data.Foldable (asum)
 import qualified Data.List as List
+import Data.List (isPrefixOf)
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -129,7 +130,9 @@ data CliOptions = CliOptions
     , optPrompt :: !(Maybe Text)
     , optPromptFile :: !(Maybe OsPath)
     , optManagedTurnFile :: !(Maybe OsPath)
-    , optResume :: !(Maybe Text)
+    , optResume :: !(Maybe (Maybe Text))
+      -- ^ 'Nothing' = flag absent, @Just Nothing@ = bare @--resume@
+      -- (latest session for the cwd), @Just (Just id)@ = explicit id.
     , optSaveSession :: !Bool
     , optAgentsMd :: !Bool
       -- ^ Discover and inject AGENTS.md at session start (default: True).
@@ -214,13 +217,28 @@ parseArgs args
     | "--version" `elem` args = Right ShowVersion
     | isRunInvocation args
     , "openai-base-url" `elem` args =
-        Left "openai-base-url was removed; run agent-cli --help"
+        Left "openai-base-url was removed; run monad-cli --help"
     | otherwise =
-        case Options.execParserPure parserPreferences commandParserInfo args of
+        case Options.execParserPure
+                parserPreferences
+                commandParserInfo
+                (normalizeResumeArgs args) of
             Options.Success command -> validateCommand command
             Options.Failure failure ->
-                Left (fst (Options.renderFailure failure "agent-cli"))
+                Left (fst (Options.renderFailure failure "monad-cli"))
             Options.CompletionInvoked _ -> Right ShowHelp
+
+-- | A bare @--resume@ has no value for optparse-applicative's option parser,
+-- which consumes the following token and fails fatally when none remains.
+-- Rewrite a valueless @--resume@ (last token, or followed by another flag)
+-- to @--resume=@ so the reader can map it to the bare-resume form.
+normalizeResumeArgs :: [String] -> [String]
+normalizeResumeArgs = \case
+    [] -> []
+    "--resume" : rest
+        | null rest || ("-" `isPrefixOf` head rest) ->
+            "--resume=" : normalizeResumeArgs rest
+    token : rest -> token : normalizeResumeArgs rest
 
 isRunInvocation :: [String] -> Bool
 isRunInvocation = \case
@@ -409,8 +427,7 @@ optionUpdateParser = asum
         "Read an internal managed-turn request"
         pathReader
         (\value options -> options { optManagedTurnFile = Just value })
-    , optionUpdate "resume" "ID" "Resume a persisted session"
-        textReader (\value options -> options { optResume = Just value })
+    , resumeOptionUpdate
     , flagUpdate "save-session" "Persist a one-shot run as a session"
         (\options -> options { optSaveSession = True })
     , boolFlagUpdate "agents-md" True "Discover and inject AGENTS.md"
@@ -459,6 +476,20 @@ optionUpdate name metavar description reader update =
                 <> Options.metavar metavar
                 <> Options.help description
             )
+
+-- | @--resume@ with an optional value: @--resume ID@ resumes that session,
+-- bare @--resume@ resumes the latest session for the current directory.
+-- A bare invocation is rewritten to @--resume=@ by 'normalizeResumeArgs'.
+resumeOptionUpdate :: Options.Parser OptionUpdate
+resumeOptionUpdate =
+    optionUpdate "resume" "ID"
+        "Resume a persisted session (default: latest for this directory)"
+        reader
+        (\value options -> options { optResume = Just value })
+  where
+    -- An empty value (bare --resume) resumes the latest session for the cwd.
+    reader = (\value -> if Text.null value then Nothing else Just value)
+        <$> textReader
 
 flagUpdate
     :: String
@@ -574,15 +605,15 @@ parseEffort = either (Left . Text.unpack) Right . parseReasoningEffort
 
 usage :: String
 usage = unlines
-    [ "Usage: agent-cli [OPTIONS]"
-    , "       agent-cli login"
-    , "       agent-cli gateway connect --url <https-url>"
-    , "       agent-cli gateway <status|disconnect>"
-    , "       agent-cli sessions [list]"
-    , "       agent-cli sessions show <session-id>"
-    , "       agent-cli mcp login <url> [--scope SCOPE]..."
-    , "       agent-cli mcp logout <url>"
-    , "       agent-cli storage <status|start|stop|migrate|doctor>"
+    [ "Usage: monad-cli [OPTIONS]"
+    , "       monad-cli login"
+    , "       monad-cli gateway connect --url <https-url>"
+    , "       monad-cli gateway <status|disconnect>"
+    , "       monad-cli sessions [list]"
+    , "       monad-cli sessions show <session-id>"
+    , "       monad-cli mcp login <url> [--scope SCOPE]..."
+    , "       monad-cli mcp logout <url>"
+    , "       monad-cli storage <status|start|stop|migrate|doctor>"
     , ""
     , "  -p, --prompt TEXT       Run one prompt and exit"
     , "      --prompt-file FILE  Read the one-shot prompt from a file"
@@ -591,7 +622,7 @@ usage = unlines
     , "      --model NAME        Override the saved last model"
     , "      --cwd DIR           Working directory for tools (default: current)"
     , "      --worktree          Create a new git worktree under ~/.haskell-agent/worktrees"
-    , "      --resume ID         Resume a persisted session from ~/.haskell-agent/sessions"
+    , "      --resume [ID]      Resume a persisted session (default: latest session for the current directory)"
     , "      --save-session      Persist a one-shot (-p) run as a session"
     , "      --agents-md         Discover and inject AGENTS.md (default)"
     , "      --no-agents-md      Skip AGENTS.md discovery"
@@ -621,7 +652,7 @@ usage = unlines
     , "                          medium otherwise)"
     , "      --show-raw-reasoning"
     , "                          Show raw OpenAI reasoning (default: summaries only)"
-    , "      --version           Print the agent-cli version"
+    , "      --version           Print the monad-cli version"
     , "      --help              Show this help"
     , ""
     , "Without -p/--prompt-file, start a REPL. Interactive REPL sessions are"

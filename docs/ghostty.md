@@ -42,7 +42,7 @@ quick-terminal-position = top
 quick-terminal-autohide = true
 ```
 
-Start `agent-cli` from the shell initialization used by that surface, or create
+Start `monad-cli` from the shell initialization used by that surface, or create
 a small shell alias dedicated to the desired project.
 
 ## Subagent panes

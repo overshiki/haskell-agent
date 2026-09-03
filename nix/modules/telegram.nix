@@ -240,14 +240,14 @@ let
             "progressive"
           ];
           default = "auto";
-          description = "MCP initialization strategy used by agent-cli.";
+          description = "MCP initialization strategy used by monad-cli.";
         };
 
         mcpServers = mkOption {
           type = types.nullOr (types.attrsOf mcpServerType);
           default = null;
           description = ''
-            Declarative agent-cli MCP servers for this instance. Null leaves
+            Declarative monad-cli MCP servers for this instance. Null leaves
             the existing machine-wide MCP configuration untouched. Any
             attribute set, including an empty one, makes this module own the
             complete mcpServers value in

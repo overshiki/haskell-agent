@@ -310,7 +310,7 @@ library
                     , vty >= 6.4 && < 7
                     , vty-crossplatform >= 0.4 && < 0.5
 
-executable agent-cli
+executable monad-cli
     import:           common-options
     hs-source-dirs:   app
     main-is:          Main.hs
@@ -326,6 +326,7 @@ executable eval-ghci-vs-bash
     main-is:          GhciVsBash.hs
     ghc-options:      -threaded -rtsopts
     build-depends:    agent-cli
+                    , agent-core
                     , agent-responses
                     , agent-responses-types
                     , agent-store

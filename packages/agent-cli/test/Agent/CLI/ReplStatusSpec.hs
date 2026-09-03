@@ -316,7 +316,7 @@ spec = do
         it "formats full and compact build metadata consistently" do
             formatBuildInfo info
                 `shouldBe`
-                    "agent-cli 1.2.3 (commit abc1234, built 2026-08-30)"
+                    "monad-cli 1.2.3 (commit abc1234, built 2026-08-30)"
             formatBuildInfoCompact info
                 `shouldBe` "v1.2.3 · abc1234 · 2026-08-30"
 

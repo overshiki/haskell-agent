@@ -93,7 +93,7 @@ import Agent.CLI.Session
       Persistence(..),
       PersistenceState(PersistenceActive, PersistencePending),
       LegacySubagentTarget,
-      SessionHandle(sessionMeta, sessionDir),
+      SessionHandle(sessionDir),
       SessionMeta(metaId, metaLastResponseId, metaPromptSnapshot, metaTitle),
       SessionTurn,
       SessionPromptSnapshot(..) )
@@ -901,10 +901,10 @@ printResumeHint progName = \case
         slot <- readIORef slotRef
         case slot of
             PersistencePending _ _ _ -> pure ()
-            PersistenceActive handle -> do
+            PersistenceActive _handle -> do
                 -- Drop an in-place "Thinking…" status so the hint is its own line.
                 Text.hPutStr stderr "\r\ESC[K"
                 clearNativeProgress stderr
                 color <- resolveColor stderr
                 putTextLn stderr
-                    (roleMuted color (resumeHint progName handle.sessionMeta.metaId))
+                    (roleMuted color (resumeHint progName))

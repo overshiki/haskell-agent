@@ -75,9 +75,9 @@ postgresStorageCommandEnv config = StorageCommandEnv
         managedPostgresStatus config >>= \case
             Left err -> pure (Left (renderStoreError err))
             Right PostgresNotInitialized ->
-                pure (Left "managed PostgreSQL is not initialized; run `agent-cli storage start`")
+                pure (Left "managed PostgreSQL is not initialized; run `monad-cli storage start`")
             Right PostgresStopped ->
-                pure (Left "managed PostgreSQL is stopped; run `agent-cli storage start`")
+                pure (Left "managed PostgreSQL is stopped; run `monad-cli storage start`")
             Right PostgresRunning ->
                 openStorePool config defaultPoolConfig >>= \case
                     Left err -> pure (Left (renderStoreError err))

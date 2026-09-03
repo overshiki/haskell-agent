@@ -31,7 +31,7 @@ spec = do
         it "uses a persisted session when one exists" do
             let transitioned = applyProviderTransition defaultCliOptions
                     (transition (Just "session-1") Nothing)
-            transitioned.optResume `shouldBe` Just "session-1"
+            transitioned.optResume `shouldBe` Just (Just "session-1")
 
     describe "setPendingExitAfter" do
         it "preserves the plan state while changing exit behavior" do

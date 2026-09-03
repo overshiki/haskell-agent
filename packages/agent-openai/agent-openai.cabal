@@ -15,7 +15,8 @@ build-type:         Simple
 extra-source-files: README.md
                   , CHANGELOG.md
                   , UPSTREAM.md
-                  , benchmark/JsonDecoding.md
+                  , data/models.json
+                  , data/prompt.md
 common common-opts
     default-language: Haskell2010
     default-extensions: OverloadedStrings

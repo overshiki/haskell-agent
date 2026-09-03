@@ -1491,12 +1491,11 @@ sessionUsageFromTurns :: SessionMeta -> [SessionTurn] -> TokenUsage
 sessionUsageFromTurns meta _turns = sessionUsageFromMeta meta
 
 -- | Copy-pasteable resume line printed on Ctrl-C, matching grok build.
-resumeHint :: String -> Text -> Text
-resumeHint progName sessionId =
-    "Resume this session with: "
-        <> shellSingleQuote progName
-        <> " --resume "
-        <> sessionId
+-- The bare @--resume@ form resolves the latest session for the directory it
+-- is started from, which is the session that was just persisted.
+resumeHint :: String -> Text
+resumeHint progName =
+    "Resume this session with: " <> shellSingleQuote progName <> " --resume"
 
 -- | POSIX single-quote so paths with spaces stay one shell word.
 shellSingleQuote :: String -> Text

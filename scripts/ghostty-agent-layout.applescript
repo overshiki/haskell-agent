@@ -21,7 +21,7 @@ on run argv
         set paneGit to split paneShell direction down with configuration cfg
         set paneAgents to split paneAgent direction down with configuration cfg
 
-        input text "agent-cli" to paneAgent
+        input text "monad-cli" to paneAgent
         send key "enter" to paneAgent
 
         input text "git status --short --branch" to paneGit

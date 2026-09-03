@@ -101,7 +101,7 @@ These are important product features, but not the core differentiation.
 2. **Copy this prompt to your coding agent to install:**
 
    ```text
-   Install haskell-agent by running `nix profile add --accept-flake-config github:digitallyinduced/haskell-agent`, then verify the installation by running `agent-cli --help`.
+   Install haskell-agent by running `nix profile add --accept-flake-config github:digitallyinduced/haskell-agent`, then verify the installation by running `monad-cli --help`.
    ```
 
    Or install it yourself:
@@ -118,27 +118,27 @@ These are important product features, but not the core differentiation.
 Start an interactive session:
 
 ```console
-agent-cli
+monad-cli
 ```
 
 The provider's Bash/shell execution tool is enabled by default. Enable the
 persistent `run_ghci` tool when needed:
 
 ```console
-agent-cli --ghci
+monad-cli --ghci
 ```
 
 The GHCi tool is optional and uses a `ghci` executable from `PATH`. Run the
 agent with a Nix-provided GHC when enabling it:
 
 ```console
-nix shell nixpkgs#ghc -c agent-cli --ghci
+nix shell nixpkgs#ghc -c monad-cli --ghci
 ```
 
 For GHCi-only operation, disable Bash explicitly:
 
 ```console
-agent-cli --ghci --no-bash
+monad-cli --ghci --no-bash
 ```
 
 During an interactive session, switch the available shell tools without
@@ -155,14 +155,14 @@ are also supported.
 Run a one-shot task:
 
 ```console
-agent-cli -p \
+monad-cli -p \
   "inspect this Cabal project, explain its architecture, and run its tests"
 ```
 
 Start in an isolated Git worktree:
 
 ```console
-agent-cli --worktree
+monad-cli --worktree
 ```
 
 By default, managed worktrees fetch and branch from the selected remote's latest
@@ -200,7 +200,7 @@ other providers:
 
 No API key is required for this Google-account flow. For Google AI Studio API
 billing instead, set `GOOGLE_API_KEY` (preferred) or `GEMINI_API_KEY`, then run
-`agent-cli --provider gemini --model gemini-3.7-flash`.
+`monad-cli --provider gemini --model gemini-3.7-flash`.
 
 ### Telegram
 
@@ -267,7 +267,7 @@ and select the provider:
 
 ```console
 claude auth login
-agent-cli --provider claude-code --model sonnet
+monad-cli --provider claude-code --model sonnet
 ```
 
 The integration keeps a `claude -p` process alive through the reusable
@@ -333,7 +333,7 @@ are discussed in [`IDEAS.md`](IDEAS.md).
 ## Architecture
 
 ```text
-                 agent-cli / future native clients
+                 monad-cli / future native clients
                               |
                    provider-neutral events
                               |
@@ -388,7 +388,7 @@ then build the CLI:
 
 ```console
 scripts/setup-cabal-build.sh
-cabal build agent-cli:exe:agent-cli
+cabal build agent-cli:exe:monad-cli
 ```
 
 The CLI needs PostgreSQL 14 or newer, with the PostgreSQL tools (`initdb`,
@@ -400,7 +400,7 @@ running:
 
 ```console
 export AGENT_POSTGRES_BIN=/usr/lib/postgresql/14/bin
-cabal run agent-cli:exe:agent-cli
+cabal run agent-cli:exe:monad-cli
 ```
 
 See [`AGENTS.md`](AGENTS.md) for the complete development workflow, including

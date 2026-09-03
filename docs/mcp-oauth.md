@@ -10,9 +10,9 @@ of the authorization response.
 ## Logging in
 
 ```
-agent-cli mcp login https://example.com/mcp
-agent-cli mcp login https://example.com/mcp --scope files:write
-agent-cli mcp logout https://example.com/mcp
+monad-cli mcp login https://example.com/mcp
+monad-cli mcp login https://example.com/mcp --scope files:write
+monad-cli mcp logout https://example.com/mcp
 ```
 
 `--scope` (repeatable) requests additional scopes for step-up authorization;

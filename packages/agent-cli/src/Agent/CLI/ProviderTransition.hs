@@ -70,7 +70,7 @@ applyProviderTransition options transition =
         , optCwd = Nothing
         , optWorktree = False
         , optEffort = Nothing
-        , optResume = transition.transitionSessionId <|> options.optResume
+        , optResume = fmap Just transition.transitionSessionId <|> options.optResume
         }
 
 setPendingExitAfter :: Bool -> PendingTurn -> PendingTurn

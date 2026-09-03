@@ -585,7 +585,7 @@
                             postInstall =
                                 (old.postInstall or "")
                                 + ''
-                                    wrapProgram "$out/bin/agent-cli" \
+                                    wrapProgram "$out/bin/monad-cli" \
                                         --set-default AGENT_SYNTAX_DIR \
                                             "${skylightingSyntaxDirectory}" \
                                         --set-default AGENT_POSTGRES_BIN \
@@ -616,7 +616,7 @@
                                     HOME="$home" \
                                     PATH="${pkgs.coreutils}/bin" \
                                     LC_ALL=C \
-                                    "${agentCliStaticExecutable}/bin/agent-cli" "$@"
+                                    "${agentCliStaticExecutable}/bin/monad-cli" "$@"
                             }
 
                             cleanup() {
@@ -649,7 +649,7 @@
                                         --set-default AGENT_SYNTAX_DIR \
                                             "${skylightingSyntaxDirectory}" \
                                         --set-default HASKELL_AGENT_EXECUTABLE \
-                                            "${agentCliExecutable}/bin/agent-cli" \
+                                            "${agentCliExecutable}/bin/monad-cli" \
                                         --prefix PATH : \
                                             "${pkgs.lib.makeBinPath [
                                                 pkgs.ffmpeg
@@ -696,7 +696,7 @@
                         ''
                             ${pkgs.bash}/bin/bash \
                                 ${./tests/functional/agent-cli-hello-world.sh} \
-                                ${agentCliExecutable}/bin/agent-cli
+                                ${agentCliExecutable}/bin/monad-cli
                             touch "$out"
                         '';
 
@@ -773,7 +773,7 @@
             {
                 # Linux uses a statically linked musl harness, wrapped with the
                 # same runtime tools as the native build. The native build
-                # remains available as `agent-cli`.
+                # remains available as `monad-cli`.
                 packages.default = agentCliStaticExecutable;
                 packages.agent-cli-static = agentCliStaticExecutable;
                 packages.agent-cli = agentCliExecutable;
@@ -801,7 +801,7 @@
 
                 apps.default = flake-utils.lib.mkApp {
                     drv = self.packages.${system}.agent-cli;
-                    exePath = "/bin/agent-cli";
+                    exePath = "/bin/monad-cli";
                 };
                 apps.agent-telegram = flake-utils.lib.mkApp {
                     drv = self.packages.${system}.agent-telegram;

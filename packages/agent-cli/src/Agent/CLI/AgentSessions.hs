@@ -1,6 +1,6 @@
 -- | Tools for creating, inspecting, and continuing persisted top-level agent
 -- sessions. CLI callers can run turns in tracked background threads, while
--- gateways retain the managed @agent-cli@ process runner.
+-- gateways retain the managed @monad-cli@ process runner.
 module Agent.CLI.AgentSessions
     ( AgentSessionToolsEnv(..)
     , SessionThreadManager
@@ -761,12 +761,12 @@ resolveAgentExecutable = do
         Just executable -> pure (Right executable)
         Nothing -> do
             current <- getExecutablePath
-            if takeFileName current == "agent-cli"
+            if takeFileName current == "monad-cli"
                 then pure (Right current)
-                else findExecutable "agent-cli" >>= \case
+                else findExecutable "monad-cli" >>= \case
                     Just executable -> pure (Right executable)
                     Nothing -> pure $ Left
-                        "could not find agent-cli; set HASKELL_AGENT_EXECUTABLE"
+                        "could not find monad-cli; set HASKELL_AGENT_EXECUTABLE"
   where
     nonEmpty = \case
         Just value | not (null value) -> Just value

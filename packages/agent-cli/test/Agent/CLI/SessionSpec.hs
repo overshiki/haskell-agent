@@ -3,6 +3,7 @@ module Agent.CLI.SessionSpec (spec) where
 import Agent.CLI.Session
 import Agent.CLI.SessionLock (acquireSessionLock, releaseSessionLock)
 import Agent.CLI.Request (requestParams)
+import Agent.CLI.Resume (latestSessionForCwd)
 import Agent.CLI.Session.StoreCodec
     ( fromStoredResponseItem
     , toStoredResponseItem
@@ -723,8 +724,24 @@ spec = describe "Agent.CLI.Session" do
             sessionTitleFromPrompt
                 "one two three four five six seven eight nine ten eleven"
                 `shouldBe` "one two three four five six seven eight nine ten"
-            resumeHint "it's" "id"
-                `shouldBe` "Resume this session with: 'it'\\''s' --resume id"
+            resumeHint "it's"
+                `shouldBe` "Resume this session with: 'it'\\''s' --resume"
+
+        it "picks the latest session for a directory, normalizing spellings" do
+            let older = (testMeta "older") { metaUpdatedAt = UTCTime (fromGregorian 2026 8 1) 0 }
+                newer = (testMeta "newer") { metaUpdatedAt = UTCTime (fromGregorian 2026 8 2) 0 }
+                other = (testMeta "other")
+                    { metaUpdatedAt = UTCTime (fromGregorian 2026 8 3) 0
+                    , metaCwd = fromFilePath "/tmp/elsewhere"
+                    }
+            latestSessionForCwd (fromFilePath "/tmp/work") [older, other, newer]
+                `shouldBe` Just "newer"
+            latestSessionForCwd (fromFilePath "/tmp/work/") [older]
+                `shouldBe` Just "older"
+            latestSessionForCwd (fromFilePath "/tmp/missing") [older, newer]
+                `shouldBe` Nothing
+            latestSessionForCwd (fromFilePath "/tmp/work") []
+                `shouldBe` Nothing
 
         it "offers rewind targets from the current branch with retained prefixes" do
             let turn effect userText responseId = SessionTurn

@@ -74,7 +74,7 @@ handoffRemote host path sessionDir transfer = do
         sessionId = meta.metaId
         importCommand =
             "cd " <> remotePath
-                <> " && agent-cli sessions import --cwd " <> remotePath
+                <> " && monad-cli sessions import --cwd " <> remotePath
         sessionPath =
             "\"$HOME/.haskell-agent/sessions/"
                 <> Text.unpack sessionId <> "\""
@@ -89,7 +89,7 @@ handoffRemote host path sessionDir transfer = do
                 <> " && rm -f " <> stagingPath
                 <> " && tmux new-session -d -s " <> quote (Text.unpack name)
                 <> " -c " <> remotePath
-                <> " agent-cli --resume " <> quote (Text.unpack sessionId)
+                <> " monad-cli --resume " <> quote (Text.unpack sessionId)
                 <> " --cwd " <> remotePath
     copyArtifacts host uploadCommand sessionDir >>= \case
         Left err -> pure (Left err)
@@ -177,7 +177,7 @@ localExecutable = do
             executable <- getExecutablePath
             pure $
                 if prog `elem` ["<interactive>", "ghc", "ghci"]
-                    then "agent-cli"
+                    then "monad-cli"
                     else executable
 
 runChecked :: FilePath -> [String] -> Text -> IO (Either Text Text)

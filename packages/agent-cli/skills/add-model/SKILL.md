@@ -120,13 +120,13 @@ repository's Codex model metadata.
 ## Validate and finish
 
 1. Validate that the edited file is syntactically valid JSON.
-2. If `agent-cli` is available, start it or use its model picker to confirm the
+2. If `monad-cli` is available, start it or use its model picker to confirm the
    catalog loads and the new id appears. Do not send a billable inference
    request without user approval.
 3. Tell the user the configured id, any environment variable they must export,
    and how to select it:
 
-   `agent-cli --model <id>`
+   `monad-cli --model <id>`
 
    They can also choose it with `/model` in a running session. If the session
    was already running, tell them to restart it so the catalog is reloaded.

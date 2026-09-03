@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: $0 /path/to/agent-cli" >&2
+  echo "usage: $0 /path/to/monad-cli" >&2
   exit 2
 fi
 
@@ -134,7 +134,7 @@ if ! timeout 10m tmux -L "$tmux_server" wait-for agent-finished; then
   tmux -L "$tmux_server" capture-pane -p -S - -t "$tmux_session" \
     >"$transcript" 2>/dev/null || true
   cat "$transcript" >&2
-  echo "agent-cli functional test timed out" >&2
+  echo "monad-cli functional test timed out" >&2
   exit 1
 fi
 
@@ -143,20 +143,20 @@ tmux -L "$tmux_server" capture-pane -p -S - -t "$tmux_session" \
 
 if [[ ! -s "$status_file" ]]; then
   cat "$transcript" >&2
-  echo "agent-cli exited without recording its status" >&2
+  echo "monad-cli exited without recording its status" >&2
   exit 1
 fi
 
 agent_status=$(<"$status_file")
 if [[ "$agent_status" -ne 0 ]]; then
   cat "$transcript" >&2
-  echo "agent-cli exited with status $agent_status" >&2
+  echo "monad-cli exited with status $agent_status" >&2
   exit 1
 fi
 
 if [[ ! -f "$workspace/Main.hs" ]]; then
   cat "$transcript" >&2
-  echo "agent-cli did not create Main.hs" >&2
+  echo "monad-cli did not create Main.hs" >&2
   exit 1
 fi
 
@@ -167,4 +167,4 @@ if [[ "$program_output" != "Hello, world!" ]]; then
   exit 1
 fi
 
-echo "agent-cli generated and ran a valid Haskell hello-world program"
+echo "monad-cli generated and ran a valid Haskell hello-world program"

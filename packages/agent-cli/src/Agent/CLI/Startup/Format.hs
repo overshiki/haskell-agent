@@ -29,7 +29,7 @@ import qualified Paths_agent_cli as Paths
 #define AGENT_BUILD_DATE "local"
 #endif
 
--- | Identity embedded into an agent-cli build.
+-- | Identity embedded into a monad-cli build.
 data BuildInfo = BuildInfo
     { buildVersion :: !Text
     , buildCommit :: !Text
@@ -46,7 +46,7 @@ agentBuildInfo =
 
 formatBuildInfo :: BuildInfo -> Text
 formatBuildInfo info =
-    "agent-cli "
+    "monad-cli "
         <> info.buildVersion
         <> " (commit "
         <> info.buildCommit

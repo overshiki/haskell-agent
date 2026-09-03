@@ -8,7 +8,7 @@ user-invocable: true
 
 # Telegram agent
 
-Use the dedicated `agent-telegram` executable. Do not use an `agent-cli`
+Use the dedicated `agent-telegram` executable. Do not use a `monad-cli`
 Telegram subcommand.
 
 ## Security rule

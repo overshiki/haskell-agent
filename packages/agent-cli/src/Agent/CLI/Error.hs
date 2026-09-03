@@ -84,7 +84,7 @@ formatApiErrorWith maybeNow retryPresentation = \case
         message
             "Authentication failed."
             (trustedDetails credentialMessage)
-            [ "Run /login or agent-cli login to reconnect "
+            [ "Run /login or monad-cli login to reconnect "
                 <> "the provider account."
             ]
     ConnectionError{exception} ->
@@ -212,7 +212,7 @@ formatProviderError retryPresentation errorType providerMessage retryAfter =
             message
                 "Authentication failed."
                 []
-                [ "Run /login or agent-cli login to reconnect "
+                [ "Run /login or monad-cli login to reconnect "
                     <> "the provider account."
                 ]
         PermissionError ->
@@ -372,7 +372,7 @@ formatHttpError status =
         message
             "Authentication failed."
             []
-            [ "Run /login or agent-cli login to reconnect "
+            [ "Run /login or monad-cli login to reconnect "
                 <> "the provider account."
             ]
     billing =

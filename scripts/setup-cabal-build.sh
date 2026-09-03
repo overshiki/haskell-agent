@@ -268,8 +268,8 @@ cabal update
 # 9. Optional build
 # ---------------------------------------------------------------------------
 if [ "$BUILD" -eq 1 ]; then
-    log "building agent-cli:exe:agent-cli ..."
-    cabal build agent-cli:exe:agent-cli
+    log "building agent-cli:exe:monad-cli ..."
+    cabal build agent-cli:exe:monad-cli
 else
     log "skipping build (pass --build to build now)"
 fi
@@ -293,7 +293,7 @@ Optional but recommended:
 
 Build the CLI with:
 
-  cabal build agent-cli:exe:agent-cli
+  cabal build agent-cli:exe:monad-cli
 
 Run the REPL with:
 

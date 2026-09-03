@@ -40,7 +40,7 @@ import System.Environment (getArgs)
 import System.Exit (ExitCode(..), exitFailure)
 import System.FilePath (takeDirectory, (</>))
 import System.IO (IOMode(..), hPutStrLn, stderr, withFile)
-import System.OsPath (unsafeEncodeUtf)
+import Agent.OsPath (unsafeEncodeUtf)
 import System.Process
     ( CreateProcess(..)
     , StdStream(..)
@@ -176,7 +176,7 @@ main = do
 parseConfig :: [String] -> Either String Config
 parseConfig args =
     go Config
-        { agentBin = "." </> "agent-cli"
+        { agentBin = "." </> "monad-cli"
         , resultsDir = "." </> "eval-results" </> "ghci-vs-bash"
         , trials = 1
         , timeoutSeconds = 180
@@ -229,7 +229,7 @@ usage = unlines
     , "  --mode NAME         ghci-only, bash-only, or ghci-plus-bash"
     , ""
     , "Example:"
-    , "  eval-ghci-vs-bash --agent-bin $(cabal list-bin agent-cli:exe:agent-cli) \\"
+    , "  eval-ghci-vs-bash --agent-bin $(cabal list-bin agent-cli:exe:monad-cli) \\"
     , "    -- --provider openai --model gpt-5.6-sol"
     ]
 

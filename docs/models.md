@@ -15,7 +15,7 @@ API key.
 
 The shipped Meta connection calls Meta Model API directly. Export
 `MODEL_API_KEY`, then select `muse-spark-1.2` with
-`agent-cli --model muse-spark-1.2` or from `/model`. The separate
+`monad-cli --model muse-spark-1.2` or from `/model`. The separate
 `meta/muse-spark-1.2` entry uses OpenRouter.
 
 For example, an unauthenticated local server exposing the streaming OpenAI
@@ -45,7 +45,7 @@ Responses API at `POST /v1/responses` can be configured as:
 }
 ```
 
-Select it with `agent-cli --model qwen-local` or from `/model`. For an
+Select it with `monad-cli --model qwen-local` or from `/model`. For an
 authenticated endpoint, set `"api_key_env": "MY_MODEL_API_KEY"` and export
 that variable. Omit `"api_key_optional": true` when a key is required.
 

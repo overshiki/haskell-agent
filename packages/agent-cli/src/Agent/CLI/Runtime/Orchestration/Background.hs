@@ -48,7 +48,7 @@ runInProcessSessionTurn runAgent parentOptions policy ghciEnabled bashEnabled
                 , optPrompt = Just message
                 , optPromptFile = Nothing
                 , optManagedTurnFile = Nothing
-                , optResume = Just handle.sessionMeta.metaId
+                , optResume = Just (Just handle.sessionMeta.metaId)
                 , optSaveSession = True
                 , optGhci = ghciEnabled
                 , optBash = bashEnabled

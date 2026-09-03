@@ -98,7 +98,7 @@ When changing the CLI UI (prompt, colors, chrome, keybindings, paste, approval p
 - Exit the agent (`:q` or Ctrl-D) before `:r`; a live stdin/WebSocket session blocks GHCi.
 - `repl` / `devMain` creates a new worktree on first open when not already under `~/.haskell-agent/worktrees`. `:reload` resumes the same session (and cwd). Manual `run` still needs `withArgs ["--worktree"]` (or `--resume` / `--cwd`) if you want a worktree.
 - The development entry point restores GHCi's original cwd when the agent exits, so a later fresh run does not silently reuse the previous worktree.
-- `cabal repl agent-cli:exe:agent-cli` + `:main` looks convenient but only interprets `Main.hs` and does **not** reload library source changes.
+- `cabal repl agent-cli:exe:monad-cli` + `:main` looks convenient but only interprets `Main.hs` and does **not** reload library source changes.
 - Keep the automatic `repl` launcher single-component. With GHC 9.10,
   Cabal's multi-home-unit mode does not support the GHCi `:module` and `:cmd`
   commands that its automatic reload/resume loop uses. Use the manual
@@ -111,7 +111,7 @@ When changing the CLI UI (prompt, colors, chrome, keybindings, paste, approval p
 `nix develop` does not impose a heap ceiling on every development command. The
 `repl` wrapper defaults `GHCRTS` to `-M8G`, which protects the machine from an
 unbounded long-running GHCi/agent process while preserving the RTS allocation
-area default. The compiled `agent-cli` executable defaults to `-N4 -M8G`; four
+area default. The compiled `monad-cli` executable defaults to `-N4 -M8G`; four
 capabilities cover concurrent agent work without multiplying the RTS
 allocation area by every host core. Both defaults are overridable because
 `-rtsopts` is enabled. Set `GHCRTS` explicitly to override the wrapper:
@@ -119,7 +119,7 @@ allocation area by every host core. Both defaults are overridable because
 ```
 GHCRTS='-M16G' repl
 GHCRTS='-M4G' cabal repl agent-cli
-cabal run agent-cli -- +RTS -N8 -M16G -RTS
+cabal run monad-cli -- +RTS -N8 -M16G -RTS
 ```
 
 Avoid large `-A` defaults: the allocation area is per capability, so

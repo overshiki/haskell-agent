@@ -33,14 +33,14 @@ Build the current agent and evaluator:
 
 ```console
 nix develop -c cabal build \
-  agent-cli:exe:agent-cli \
+  agent-cli:exe:monad-cli \
   agent-cli:exe:eval-ghci-vs-bash
 ```
 
 Locate both executables and run one trial per task/configuration:
 
 ```console
-agent_bin=$(nix develop -c cabal list-bin agent-cli:exe:agent-cli)
+agent_bin=$(nix develop -c cabal list-bin agent-cli:exe:monad-cli)
 eval_bin=$(nix develop -c cabal list-bin agent-cli:exe:eval-ghci-vs-bash)
 
 "$eval_bin" \

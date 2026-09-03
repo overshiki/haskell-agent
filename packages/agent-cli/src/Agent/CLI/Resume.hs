@@ -14,6 +14,7 @@ module Agent.CLI.Resume
     , initialResumeBrowser
     , initialResumeState
     , insertResumeSearch
+    , latestSessionForCwd
     , loadResumeEntry
     , resumeEntryFromPage
     , moveResumeBrowser
@@ -59,7 +60,7 @@ import Agent.CLI.TextLayout
     , clampSelectionIndex
     , renderSplitPaneFrame
     )
-import Agent.OsPath (toText)
+import Agent.OsPath (normalizeLexically, toText)
 import Agent.Provider (providerSlug)
 import Agent.Responses.Types (ResponseItem(..))
 import Agent.Store.Postgres.Connection (StorePool)
@@ -150,6 +151,21 @@ resumeNeedsGeneratedContext turns =
 -- | Build picker entries from already loaded sessions.
 resumeEntriesFrom :: [(SessionMeta, [SessionTurn])] -> [ResumeEntry]
 resumeEntriesFrom = map (uncurry entryFrom)
+
+-- | Id of the most recently updated session recorded for @cwd@, comparing
+-- normalized directory spellings so trailing slashes or @.@ components do
+-- not hide a match. 'Nothing' when no session was recorded for the directory.
+latestSessionForCwd :: OsPath -> [SessionMeta] -> Maybe Text
+latestSessionForCwd cwd metas =
+    case filter matches metas of
+        [] -> Nothing
+        first : rest -> Just (foldl' newer first rest).metaId
+  where
+    target = normalizeLexically cwd
+    matches meta = normalizeLexically meta.metaCwd == target
+    newer newerMeta olderMeta
+        | newerMeta.metaUpdatedAt >= olderMeta.metaUpdatedAt = newerMeta
+        | otherwise = olderMeta
 
 resumeEntryFromMeta :: SessionMeta -> ResumeEntry
 resumeEntryFromMeta meta = entryFromWith False meta []

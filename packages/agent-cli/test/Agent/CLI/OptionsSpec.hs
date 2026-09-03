@@ -120,7 +120,7 @@ spec = do
         it "rejects the removed openai-base-url command" do
             parseArgs ["openai-base-url"]
                 `shouldBe`
-                    Left "openai-base-url was removed; run agent-cli --help"
+                    Left "openai-base-url was removed; run monad-cli --help"
 
         it "keeps the last repeated option value" do
             parseArgs
@@ -214,9 +214,28 @@ spec = do
             parseArgs ["storage", "vacuum"] `shouldSatisfy` isLeft
 
         it "parses --resume and --save-session" do
+            parseArgs ["-p", "hi"]
+                `shouldBe` Right (RunAgent defaultCliOptions
+                    { optPrompt = Just "hi"
+                    , optResume = Nothing
+                    })
             parseArgs ["--resume", "2026-08-19-abcd1234"]
                 `shouldBe` Right (RunAgent defaultCliOptions
-                    { optResume = Just "2026-08-19-abcd1234" })
+                    { optResume = Just (Just "2026-08-19-abcd1234") })
+            parseArgs ["--resume=2026-08-19-abcd1234"]
+                `shouldBe` Right (RunAgent defaultCliOptions
+                    { optResume = Just (Just "2026-08-19-abcd1234") })
+            parseArgs ["--resume"]
+                `shouldBe` Right (RunAgent defaultCliOptions
+                    { optResume = Just Nothing })
+            parseArgs ["--resume="]
+                `shouldBe` Right (RunAgent defaultCliOptions
+                    { optResume = Just Nothing })
+            parseArgs ["--resume", "--yolo"]
+                `shouldBe` Right (RunAgent defaultCliOptions
+                    { optResume = Just Nothing
+                    , optYolo = True
+                    })
             parseArgs ["-p", "hi", "--save-session"]
                 `shouldBe` Right (RunAgent defaultCliOptions
                     { optPrompt = Just "hi"
@@ -225,6 +244,7 @@ spec = do
 
         it "rejects --resume with --worktree" do
             parseArgs ["--resume", "abc", "--worktree"] `shouldSatisfy` isLeft
+            parseArgs ["--resume", "--worktree"] `shouldSatisfy` isLeft
 
         it "parses --agents-md and --no-agents-md" do
             parseArgs ["--no-agents-md", "-p", "hi"]

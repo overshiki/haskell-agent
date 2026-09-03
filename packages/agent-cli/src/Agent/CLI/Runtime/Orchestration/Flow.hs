@@ -69,7 +69,7 @@ import Agent.CLI.Recap ()
 import Agent.CLI.Render ( putTextLn )
 import Agent.CLI.ReplMode ()
 import Agent.CLI.Request ()
-import Agent.CLI.Resume ()
+import Agent.CLI.Resume (latestSessionForCwd)
 import Agent.CLI.Runtime.HistorySource
     ( loadFullscreenHistoryPage, sessionUiPageSize )
 import Agent.CLI.Runtime.Orchestration.Background ()
@@ -94,6 +94,7 @@ import Agent.CLI.Runtime.Types
 import Agent.CLI.Secret ()
 import Agent.CLI.Session
     ( deleteSession,
+      listSessions,
       loadActiveSession,
       loadRecentSessionTurns,
       sessionDirForId,
@@ -271,7 +272,7 @@ runAgentWithRuntime processRuntime runMode options = do
                             , optEffort = Nothing
                             , optPrompt = Nothing
                             , optPromptFile = Nothing
-                            , optResume = Just sessionId
+                            , optResume = Just (Just sessionId)
                             }
                         Nothing
             RunForkSession sessionId directive ->
@@ -286,7 +287,7 @@ runAgentWithRuntime processRuntime runMode options = do
                             , optEffort = Nothing
                             , optPrompt = Nothing
                             , optPromptFile = Nothing
-                            , optResume = Just sessionId
+                            , optResume = Just (Just sessionId)
                             }
                         Nothing
             RunDeleteSession sessionId cwd -> do
@@ -421,7 +422,7 @@ runAgentWithRuntime processRuntime runMode options = do
             , "github:digitallyinduced/haskell-agent"
             ]
         executeFile
-            "agent-cli"
+            "monad-cli"
             True
             ["--resume", Text.unpack sessionId]
             Nothing
@@ -520,7 +521,9 @@ runAgent
                                     { transitionTarget = target
                                     , transitionAccountSelectionId = Nothing
                                     , transitionAccountId = Nothing
-                                    , transitionSessionId = nextOptions.optResume
+                                    , transitionSessionId = case nextOptions.optResume of
+                                Just (Just sessionId) -> Just sessionId
+                                _ -> Nothing
                                     , transitionPendingTurn = Nothing
                                     , transitionUnavailableProviders = Set.empty
                                     , transitionCause = ManualTransition
@@ -654,7 +657,34 @@ prepareAgentIterationTracked
     let sessionPool = trustedPool databaseStore
     resumed <- case options.optResume of
         Nothing -> pure Nothing
-        Just sessionId -> do
+        Just maybeSessionId -> do
+            sessionId <- case maybeSessionId of
+                Just sessionId -> pure sessionId
+                Nothing -> do
+                    -- Mirror the target-cwd computation below so bare
+                    -- --resume resolves against the same directory the run
+                    -- would have used without --resume.
+                    targetCwd <- case options.optCwd of
+                        Just requestedCwd -> makeAbsolute requestedCwd
+                        Nothing ->
+                            maybe
+                                getCurrentDirectory
+                                makeAbsolute
+                                runMode.runCwdHint
+                    (metas, warnings) <- listSessions sessionPool root
+                    forM_ warnings \warning ->
+                        putTextLn stderrHandle ("warning: " <> warning)
+                    case latestSessionForCwd targetCwd metas of
+                        Just latestId -> pure latestId
+                        Nothing -> do
+                            let err =
+                                    "no persisted session for "
+                                        <> toText targetCwd
+                                        <> " — start one with `monad-cli`,"
+                                        <> " or list sessions with"
+                                        <> " `monad-cli sessions list`"
+                            signalReady (Left err)
+                            failPreparation (Text.unpack err)
             dir <- either
                 (\err -> do
                     signalReady (Left err)
@@ -964,5 +994,5 @@ restartSessionOptions options sessionId =
         , optPrompt = Nothing
         , optPromptFile = Nothing
         , optManagedTurnFile = Nothing
-        , optResume = Just sessionId
+        , optResume = Just (Just sessionId)
         }
