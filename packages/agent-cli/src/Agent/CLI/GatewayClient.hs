@@ -42,7 +42,9 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race)
 import Control.Concurrent.STM (atomically, retry)
 import Control.Exception.Safe (bracket, bracketOnError, tryAny)
-import Control.Monad (when)
+import Control.Monad (unless, when)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT)
 import Crypto.Hash (Digest, SHA256, hash)
 import Data.Aeson ((.=))
 import Data.Aeson qualified as Aeson
@@ -408,59 +410,50 @@ connectGatewayBrowserWithCancel
                         "Gateway browser authorization failed unexpectedly."
                 Right result -> result
   where
-    runBrowserFlow baseUrl listener = do
-        redirectUri <- gatewayLoopbackRedirectUri listener
-        verifier <- randomUrlText 32
-        state <- randomUrlText 32
-        case
-            gatewayAuthorizationUrl
-                baseUrl
-                redirectUri
-                state
-                (gatewayPkceChallenge verifier)
-                rawClientName of
-            Left err -> pure (Left err)
-            Right authorizationUrl -> do
-                presented <- present authorizationUrl
-                if not presented
-                    then
-                        pure
-                            (Left
-                                "Could not open the gateway authorization page.")
-                    else do
-                        callback <-
-                            timeout
-                                gatewayBrowserTimeoutMicroseconds
-                                (race
-                                    waitForCancellation
-                                    (receiveGatewayAuthorizationCallback
-                                        listener state))
-                        case callback of
-                            Nothing ->
-                                pure
-                                    (Left
-                                        "Gateway browser authorization timed out.")
-                            Just (Left ()) ->
-                                pure
-                                    (Left
-                                        "Gateway browser authorization was cancelled.")
-                            Just (Right (Left err)) -> pure (Left err)
-                            Just (Right (Right authorizationCode)) ->
-                                exchangeGatewayAuthorizationCode
-                                    baseUrl
-                                    redirectUri
-                                    verifier
-                                    authorizationCode
-                                    >>= \case
-                                        Left err -> pure (Left err)
-                                        Right response ->
-                                            case
-                                                validateGatewayAuthorizationCodeResponse
-                                                    baseUrl response of
-                                                Left err -> pure (Left err)
-                                                Right credential ->
-                                                    saveGatewayCredential
-                                                        credential
+    runBrowserFlow baseUrl listener = runExceptT run
+      where
+        run :: ExceptT Text IO ()
+        run = do
+            redirectUri <- liftIO (gatewayLoopbackRedirectUri listener)
+            verifier <- liftIO (randomUrlText 32)
+            state <- liftIO (randomUrlText 32)
+            authorizationUrl <- except
+                (gatewayAuthorizationUrl
+                    baseUrl
+                    redirectUri
+                    state
+                    (gatewayPkceChallenge verifier)
+                    rawClientName)
+            presented <- liftIO (present authorizationUrl)
+            unless presented $
+                except
+                    (Left "Could not open the gateway authorization page.")
+            callback <- liftIO $
+                timeout
+                    gatewayBrowserTimeoutMicroseconds
+                    (race
+                        waitForCancellation
+                        (receiveGatewayAuthorizationCallback
+                            listener
+                            state))
+            authorizationCode <- case callback of
+                Nothing ->
+                    except (Left "Gateway browser authorization timed out.")
+                Just (Left ()) ->
+                    except
+                        (Left "Gateway browser authorization was cancelled.")
+                Just (Right (Left err)) -> except (Left err)
+                Just (Right (Right authorizationCode)) ->
+                    pure authorizationCode
+            response <- ExceptT
+                (exchangeGatewayAuthorizationCode
+                    baseUrl
+                    redirectUri
+                    verifier
+                    authorizationCode)
+            credential <- except
+                (validateGatewayAuthorizationCodeResponse baseUrl response)
+            ExceptT (saveGatewayCredential credential)
 
 gatewayBrowserTimeoutMicroseconds :: Int
 gatewayBrowserTimeoutMicroseconds = 5 * 60 * 1_000_000

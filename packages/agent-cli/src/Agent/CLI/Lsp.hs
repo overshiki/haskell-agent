@@ -73,10 +73,12 @@ import Control.Exception.Safe
     )
 import Control.Monad
     ( forM
+    , forM_
     , unless
     , void
     , when
     )
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT, withExceptT)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString as BS
@@ -393,64 +395,55 @@ spawnClient name config workspace logHandle = mask \restore -> do
                 `onException` stopAsync stderrWorker)
         `onException` closePartial
 initializeClient :: LspClient -> IO (Either Text ())
-initializeClient client = do
-    let rootUri = fileUri client.clientWorkspace
-        rootName =
-            Text.pack
-                (let value = FilePath.takeFileName client.clientWorkspace
-                 in if null value then "workspace" else value)
-        params =
-            Aeson.object
-                [ "processId" .= Aeson.Null
-                , "clientInfo" .= Aeson.object
-                    [ "name" .= ("haskell-agent" :: Text)
-                    ]
-                , "rootUri" .= rootUri
-                , "workspaceFolders" .=
-                    [ Aeson.object
-                        [ "uri" .= rootUri
-                        , "name" .= rootName
+initializeClient client = runExceptT run
+  where
+    run :: ExceptT Text IO ()
+    run = do
+        let rootUri = fileUri client.clientWorkspace
+            rootName =
+                Text.pack
+                    (let value = FilePath.takeFileName client.clientWorkspace
+                     in if null value then "workspace" else value)
+            params =
+                Aeson.object
+                    [ "processId" .= Aeson.Null
+                    , "clientInfo" .= Aeson.object
+                        [ "name" .= ("haskell-agent" :: Text)
                         ]
+                    , "rootUri" .= rootUri
+                    , "workspaceFolders" .=
+                        [ Aeson.object
+                            [ "uri" .= rootUri
+                            , "name" .= rootName
+                            ]
+                        ]
+                    , "capabilities" .= clientCapabilities
+                    , "initializationOptions"
+                        .= client.clientConfig.lspInitializationOptions
                     ]
-                , "capabilities" .= clientCapabilities
-                , "initializationOptions"
-                    .= client.clientConfig.lspInitializationOptions
-                ]
-    requestClient
-        client
-        client.clientConfig.lspStartupTimeoutMilliseconds
-        "initialize"
-        params >>= \case
-            Left err -> pure (Left ("initialize failed: " <> err))
-            Right _ -> do
-                initialized <-
-                    sendNotificationWithin
-                        client
-                        client.clientConfig.lspStartupTimeoutMilliseconds
-                        "initialized"
-                        (Aeson.object [])
-                case initialized of
-                    Left err ->
-                        pure
-                            (Left
-                                ("post-initialize notification failed: "
-                                    <> err))
-                    Right () ->
-                        case client.clientConfig.lspSettings of
-                            Nothing -> pure (Right ())
-                            Just settings ->
-                                sendNotificationWithin
-                                    client
-                                    client.clientConfig.lspStartupTimeoutMilliseconds
-                                    "workspace/didChangeConfiguration"
-                                    (Aeson.object
-                                        ["settings" .= settings]) >>= \case
-                                            Left err ->
-                                                pure
-                                                    (Left
-                                                        ("settings notification failed: "
-                                                            <> err))
-                                            Right () -> pure (Right ())
+        _ <-
+            withExceptT ("initialize failed: " <>)
+                . ExceptT
+                $ requestClient
+                    client
+                    client.clientConfig.lspStartupTimeoutMilliseconds
+                    "initialize"
+                    params
+        withExceptT ("post-initialize notification failed: " <>)
+            . ExceptT
+            $ sendNotificationWithin
+                client
+                client.clientConfig.lspStartupTimeoutMilliseconds
+                "initialized"
+                (Aeson.object [])
+        forM_ client.clientConfig.lspSettings \settings ->
+            withExceptT ("settings notification failed: " <>)
+                . ExceptT
+                $ sendNotificationWithin
+                    client
+                    client.clientConfig.lspStartupTimeoutMilliseconds
+                    "workspace/didChangeConfiguration"
+                    (Aeson.object ["settings" .= settings])
 
 runLsp :: LspRuntime -> LspRequest -> IO (Either Text Text)
 runLsp runtime = \case

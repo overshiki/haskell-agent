@@ -31,6 +31,12 @@ import Control.Concurrent.STM
     )
 import Control.Exception.Safe (SomeException, displayException, tryAny)
 import Control.Monad (filterM)
+import Control.Monad.Trans.Except
+    ( ExceptT(..)
+    , except
+    , runExceptT
+    , withExceptT
+    )
 import Data.Aeson
     ( FromJSON(..)
     , Value(..)
@@ -42,6 +48,7 @@ import Data.Aeson
 import System.OsPath (OsPath)
 import Data.Aeson.Types (Parser)
 import qualified Data.ByteString as BS
+import Data.Bifunctor (first)
 import Data.Char (isAlphaNum)
 import Data.List (sort, sortOn)
 import Data.Map.Strict (Map)
@@ -395,66 +402,59 @@ loadSkillFile
     -> FilePath
     -> IO (Either SkillWarning Skill)
 loadSkillFile scope origin path = do
-    result <- tryAny (retryOnFileBusy (Text.readFile path))
-    case result of
-        Left err ->
-            pure $ Left (warning (Text.pack (displayException err)))
-        Right fileText ->
-            case splitFrontmatter fileText of
-                Left err -> pure (Left (warning err))
-                Right (yamlText, body) ->
-                    case decodeEither' (Text.encodeUtf8 yamlText) of
-                        Left err ->
-                            pure $ Left
-                                (warning
-                                    (Text.pack (prettyPrintParseException err)))
-                        Right frontmatter ->
-                            case validateFrontmatter scope path frontmatter of
-                                Left err -> pure (Left (warning err))
-                                Right () ->
-                                    loadOpenAiMetadata (takeDirectory path) >>= \case
-                                        Left err ->
-                                            pure $ Left
-                                                (warning
-                                                    ("agents/openai.yaml: " <> err))
-                                        Right openAi -> do
-                                            let argumentHint =
-                                                    frontmatter.fmArgumentHint
-                                                        <|> (openAi >>= (.openAiArgumentHint))
-                                                modelInvocable =
-                                                    not frontmatter.fmDisableModelInvocation
-                                                        && fromMaybe True
-                                                            (openAi >>= (.openAiAllowImplicit))
-                                            pure $ Right Skill
-                                                { skillName = frontmatter.fmName
-                                                , skillDescription = frontmatter.fmDescription
-                                                , skillDisplayName =
-                                                    openAi >>= (.openAiDisplayName)
-                                                , skillShortDescription =
-                                                    (openAi >>= (.openAiShortDescription))
-                                                        <|> Map.lookup "short-description"
-                                                            frontmatter.fmMetadata
-                                                , skillDefaultPrompt =
-                                                    openAi >>= (.openAiDefaultPrompt)
-                                                , skillWhenToUse = frontmatter.fmWhenToUse
-                                                , skillContextMode = frontmatter.fmContextMode
-                                                , skillArgumentHint = argumentHint
-                                                , skillUserInvocable = frontmatter.fmUserInvocable
-                                                , skillModelInvocable = modelInvocable
-                                                , skillAllowedTools = frontmatter.fmAllowedTools
-                                                , skillModelOverride = frontmatter.fmModel
-                                                , skillEffortOverride = frontmatter.fmEffort
-                                                , skillLicense = frontmatter.fmLicense
-                                                , skillCompatibility = frontmatter.fmCompatibility
-                                                , skillMetadata = frontmatter.fmMetadata
-                                                , skillPath = unsafeEncodeUtf path
-                                                , skillDirectory = unsafeEncodeUtf (takeDirectory path)
-                                                , skillBody = Text.strip body
-                                                , skillFileText = fileText
-                                                , skillScope = scope
-                                                , skillOrigin = origin
-                                                }
+    result <- runExceptT run
+    pure case result of
+        Left message -> Left (warning message)
+        Right skill -> Right skill
   where
+    run :: ExceptT Text IO Skill
+    run = do
+        fileText <-
+            withExceptT (Text.pack . displayException) . ExceptT
+                $ tryAny (retryOnFileBusy (Text.readFile path))
+        (yamlText, body) <- except (splitFrontmatter fileText)
+        frontmatter <- except
+            $ first (Text.pack . prettyPrintParseException)
+                (decodeEither' (Text.encodeUtf8 yamlText))
+        except (validateFrontmatter scope path frontmatter)
+        openAi <-
+            withExceptT ("agents/openai.yaml: " <>)
+                . ExceptT
+                $ loadOpenAiMetadata (takeDirectory path)
+        let argumentHint =
+                frontmatter.fmArgumentHint
+                    <|> (openAi >>= (.openAiArgumentHint))
+            modelInvocable =
+                not frontmatter.fmDisableModelInvocation
+                    && fromMaybe True (openAi >>= (.openAiAllowImplicit))
+        pure Skill
+            { skillName = frontmatter.fmName
+            , skillDescription = frontmatter.fmDescription
+            , skillDisplayName = openAi >>= (.openAiDisplayName)
+            , skillShortDescription =
+                (openAi >>= (.openAiShortDescription))
+                    <|> Map.lookup "short-description"
+                        frontmatter.fmMetadata
+            , skillDefaultPrompt = openAi >>= (.openAiDefaultPrompt)
+            , skillWhenToUse = frontmatter.fmWhenToUse
+            , skillContextMode = frontmatter.fmContextMode
+            , skillArgumentHint = argumentHint
+            , skillUserInvocable = frontmatter.fmUserInvocable
+            , skillModelInvocable = modelInvocable
+            , skillAllowedTools = frontmatter.fmAllowedTools
+            , skillModelOverride = frontmatter.fmModel
+            , skillEffortOverride = frontmatter.fmEffort
+            , skillLicense = frontmatter.fmLicense
+            , skillCompatibility = frontmatter.fmCompatibility
+            , skillMetadata = frontmatter.fmMetadata
+            , skillPath = unsafeEncodeUtf path
+            , skillDirectory = unsafeEncodeUtf (takeDirectory path)
+            , skillBody = Text.strip body
+            , skillFileText = fileText
+            , skillScope = scope
+            , skillOrigin = origin
+            }
+
     warning message = SkillWarning (unsafeEncodeUtf path) message
 
 loadOpenAiMetadata :: FilePath -> IO (Either Text (Maybe OpenAiMetadata))

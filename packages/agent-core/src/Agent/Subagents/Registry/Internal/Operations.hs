@@ -3,7 +3,8 @@ module Agent.Subagents.Registry.Internal.Operations where
 
 
 import Agent.Cancel
-    ( newCancelFlag
+    ( CancelFlag
+    , newCancelFlag
     , requestCancel
     , resetCancel
     )
@@ -26,11 +27,17 @@ import Agent.Subagents.Types
     , minWaitTimeoutMs
     )
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (race)
+import Control.Concurrent.Async (Async, race)
 import Control.Concurrent.MVar (withMVar)
 import Control.Concurrent.STM
 import Control.Exception.Safe (finally)
 import Control.Monad (void)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except
+    ( ExceptT(..)
+    , except
+    , runExceptT
+    )
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -499,43 +506,10 @@ restoreSubagentResolvedWithCwd
         asyncVar <- newTVarIO Nothing
         previousVar <- newTVarIO previous
         lastUpdateVar <- newTVarIO Nothing
-        restored <- atomically do
-            closed <- readTVar registry.registryClosed
-            if closed
-                then pure (Left "Subagent registry is closed.")
-                else do
-                    agents <- readTVar registry.registryAgents
-                    identity <- resolveIdentity agents
-                    case identity of
-                        Left err -> pure (Left err)
-                        Right (resolvedPath, resolvedDepth) -> do
-                            paths <- readTVar registry.registryPaths
-                            case Map.lookup resolvedPath paths of
-                                Just owner | owner /= agentId ->
-                                    pure $ Left $
-                                        "task path already in use: "
-                                            <> taskPathText resolvedPath
-                                _ -> do
-                                    let record = SubagentRecord
-                                            { recordId = agentId
-                                            , recordParent = parentId
-                                            , recordDepth = resolvedDepth
-                                            , recordNickname = nickname
-                                            , recordPhase = phaseVar
-                                            , recordCancel = cancelFlag
-                                            , recordMailbox = mailbox
-                                            , recordAsync = asyncVar
-                                            , recordPreviousResponseId = previousVar
-                                            , recordLastUpdate = lastUpdateVar
-                                            , recordTaskPath = resolvedPath
-                                            , recordCwd = childCwd
-                                            }
-                                    writeTVar registry.registryAgents
-                                        (Map.insert agentId record agents)
-                                    whenSTM (resolvedPath /= taskPathRoot) $
-                                        writeTVar registry.registryPaths
-                                            (Map.insert resolvedPath agentId paths)
-                                    pure (Right record)
+        restored <- atomically
+            (runExceptT
+                (admitRestored
+                    cancelFlag mailbox phaseVar asyncVar previousVar lastUpdateVar))
         case restored of
             Left err -> pure (Left err)
             Right record -> do
@@ -549,6 +523,52 @@ restoreSubagentResolvedWithCwd
                         rollbackAdmission registry record
                         pure (Left err)
                     Right () -> pure (Right agentId)
+      where
+        admitRestored
+            :: CancelFlag
+            -> TQueue SubagentWork
+            -> TVar SubagentPhase
+            -> TVar (Maybe (Async ()))
+            -> TVar (Maybe Text)
+            -> TVar (Maybe (Int, SubagentStatus))
+            -> ExceptT Text STM SubagentRecord
+        admitRestored cancelFlag mailbox phaseVar asyncVar previousVar lastUpdateVar = do
+            closed <- lift (readTVar registry.registryClosed)
+            except (deny closed "Subagent registry is closed.")
+            agents <- lift (readTVar registry.registryAgents)
+            (resolvedPath, resolvedDepth) <- ExceptT (resolveIdentity agents)
+            paths <- lift (readTVar registry.registryPaths)
+            except (deny (conflictsWithOtherOwner resolvedPath paths)
+                ("task path already in use: " <> taskPathText resolvedPath))
+            let record = SubagentRecord
+                    { recordId = agentId
+                    , recordParent = parentId
+                    , recordDepth = resolvedDepth
+                    , recordNickname = nickname
+                    , recordPhase = phaseVar
+                    , recordCancel = cancelFlag
+                    , recordMailbox = mailbox
+                    , recordAsync = asyncVar
+                    , recordPreviousResponseId = previousVar
+                    , recordLastUpdate = lastUpdateVar
+                    , recordTaskPath = resolvedPath
+                    , recordCwd = childCwd
+                    }
+            lift (writeTVar registry.registryAgents
+                (Map.insert agentId record agents))
+            lift (whenSTM (resolvedPath /= taskPathRoot) $
+                writeTVar registry.registryPaths
+                    (Map.insert resolvedPath agentId paths))
+            pure record
+
+        conflictsWithOtherOwner resolvedPath paths =
+            case Map.lookup resolvedPath paths of
+                Just owner -> owner /= agentId
+                Nothing -> False
+
+        deny condition message
+            | condition = Left message
+            | otherwise = Right ()
 
 getStatus :: SubagentRegistry -> SubagentId -> IO SubagentStatus
 getStatus registry agentId = atomically (readStatusSTM registry agentId)

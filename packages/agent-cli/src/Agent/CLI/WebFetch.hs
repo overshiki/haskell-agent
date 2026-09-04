@@ -26,6 +26,7 @@ import Control.Concurrent.MVar
     )
 import Control.Exception.Safe (displayException, tryAny)
 import Control.Monad (unless, when)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT, withExceptT)
 import Data.Bits ((.&.), shiftR)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
@@ -207,94 +208,90 @@ fetchOne
     -> URI
     -> HostAddress
     -> IO (Either Text HopResult)
-fetchOne runtime uri pinnedAddress = do
-    parsed <- tryAny $ Http.parseRequest (uriToString id uri "")
-    case parsed of
-        Left exception ->
-            pure . Left $
-                "Invalid web_fetch request: "
-                    <> Text.pack (displayException exception)
-        Right baseRequest -> do
-            let configured = baseRequest
-                    { Http.method = "GET"
-                    , HttpInternal.hostAddress = Just pinnedAddress
-                    , Http.redirectCount = 0
-                    , Http.checkResponse = \_ _ -> pure ()
-                    , Http.responseTimeout =
-                        Http.responseTimeoutMicro
-                            ( runtime.runtimeConfig.webFetchTimeoutSeconds
-                                * 1000000
-                            )
-                    , Http.requestHeaders =
-                        [ (hUserAgent, webFetchUserAgent)
-                        , ( hAccept
-                          , "text/markdown,text/html,application/xhtml+xml,\
-                            \application/json,text/plain;q=0.9,*/*;q=0.5"
-                          )
-                        , (hAcceptLanguage, "en-US,en;q=0.9")
-                        ]
-                    }
-            response <- tryAny $
-                Http.withResponse configured runtime.runtimeManager \value -> do
-                    let status = statusCode (Http.responseStatus value)
-                    if isRedirectStatus status
-                        then case
-                            lookup hLocation (Http.responseHeaders value)
-                        of
-                            Nothing ->
-                                pure
-                                    (Left
-                                        "web_fetch redirect response omitted Location")
-                            Just location ->
-                                pure (redirectTarget uri location)
-                        else if status < 200 || status >= 300
-                            then
-                                pure . Left $
-                                    "web_fetch returned HTTP status "
-                                        <> Text.pack (show status)
-                        else do
-                            let maxBytes =
-                                    runtime.runtimeConfig.webFetchMaxContentBytes
-                                contentLength =
-                                    lookup hContentLength
-                                        (Http.responseHeaders value)
-                                        >>= readMaybe . BS8.unpack
-                            case contentLength of
-                                Just size | size > maxBytes ->
-                                    pure . Left $
-                                        "web_fetch response exceeds maximum size of "
-                                            <> Text.pack (show maxBytes)
-                                            <> " bytes"
-                                _ -> do
-                                    readBodyLimited
-                                        maxBytes
-                                        (Http.responseBody value)
-                                        >>= \case
-                                            Left err -> pure (Left err)
-                                            Right body ->
-                                                pure . Right . HopContent $
-                                                    FetchedPage
-                                                        { fetchedUrl =
-                                                            Text.pack
-                                                                (uriToString
-                                                                    id uri "")
-                                                        , fetchedStatus =
-                                                            status
-                                                        , fetchedContentType =
-                                                            headerText
-                                                                hContentType
-                                                                "text/html"
-                                                                (Http.responseHeaders
-                                                                    value)
-                                                        , fetchedBody = body
-                                                        }
-            pure case response of
-                Left exception ->
-                    Left
-                        ( "web_fetch HTTP request failed: "
-                            <> Text.pack (displayException exception)
+fetchOne runtime uri pinnedAddress = runExceptT run
+  where
+    run :: ExceptT Text IO HopResult
+    run = do
+        baseRequest <-
+            withExceptT
+                ( ("Invalid web_fetch request: " <>) . Text.pack
+                    . displayException
+                )
+                . ExceptT
+                $ tryAny (Http.parseRequest (uriToString id uri ""))
+        let configured = baseRequest
+                { Http.method = "GET"
+                , HttpInternal.hostAddress = Just pinnedAddress
+                , Http.redirectCount = 0
+                , Http.checkResponse = \_ _ -> pure ()
+                , Http.responseTimeout =
+                    Http.responseTimeoutMicro
+                        ( runtime.runtimeConfig.webFetchTimeoutSeconds
+                            * 1000000
                         )
-                Right result -> result
+                , Http.requestHeaders =
+                    [ (hUserAgent, webFetchUserAgent)
+                    , ( hAccept
+                      , "text/markdown,text/html,application/xhtml+xml,\
+                        \application/json,text/plain;q=0.9,*/*;q=0.5"
+                      )
+                    , (hAcceptLanguage, "en-US,en;q=0.9")
+                    ]
+                }
+        response <-
+            withExceptT
+                ( ("web_fetch HTTP request failed: " <>) . Text.pack
+                    . displayException
+                )
+                . ExceptT
+                $ tryAny
+                    (Http.withResponse configured runtime.runtimeManager handleResponse)
+        except response
+
+    handleResponse
+        :: Http.Response Http.BodyReader -> IO (Either Text HopResult)
+    handleResponse value = runExceptT do
+        let status = statusCode (Http.responseStatus value)
+            headers = Http.responseHeaders value
+        if isRedirectStatus status
+            then case lookup hLocation headers of
+                Nothing ->
+                    except
+                        (Left "web_fetch redirect response omitted Location")
+                Just location -> except (redirectTarget uri location)
+            else if status < 200 || status >= 300
+                then
+                    except
+                        (Left
+                            ( "web_fetch returned HTTP status "
+                                <> Text.pack (show status)
+                            )
+                        )
+                else do
+                    let maxBytes =
+                            runtime.runtimeConfig.webFetchMaxContentBytes
+                        contentLength =
+                            lookup hContentLength headers
+                                >>= readMaybe . BS8.unpack
+                    case contentLength of
+                        Just size | size > maxBytes ->
+                            except
+                                (Left
+                                    ( "web_fetch response exceeds maximum size of "
+                                        <> Text.pack (show maxBytes)
+                                        <> " bytes"
+                                    )
+                                )
+                        _ -> pure ()
+                    body <- ExceptT
+                        (readBodyLimited maxBytes (Http.responseBody value))
+                    pure . HopContent $ FetchedPage
+                        { fetchedUrl = Text.pack (uriToString id uri "")
+                        , fetchedStatus = status
+                        , fetchedContentType =
+                            headerText hContentType "text/html" headers
+                        , fetchedBody = body
+                        }
 
 redirectTarget :: URI -> BS.ByteString -> Either Text HopResult
 redirectTarget current location = do

@@ -3,7 +3,8 @@ module Agent.Subagents.Registry.Internal.Core where
 
 
 import Agent.Cancel
-    ( newCancelFlag
+    ( CancelFlag
+    , newCancelFlag
     , requestCancel
     , resetCancel
     , waitCancel
@@ -40,6 +41,12 @@ import Control.Exception.Safe
     )
 import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except
+    ( ExceptT(..)
+    , except
+    , runExceptT
+    )
 import Control.Monad.Trans.Resource (runResourceT)
 import Data.Acquire (allocateAcquire, withAcquire)
 import Data.IORef
@@ -342,95 +349,108 @@ spawnSubagentAtWithIdPreparedForTurn
     asyncVar <- newTVarIO Nothing
     previousVar <- newTVarIO Nothing
     lastUpdateVar <- newTVarIO Nothing
-    admitted <- withMVar registry.registryLifecycle \_ -> atomically do
-        closed <- readTVar registry.registryClosed
-        aborted <- isRootTurnAborted registry rootTurnId
-        if closed
-            then pure (Left "Subagent registry is closed.")
-            else if aborted
-                then pure (Left "Root turn was aborted.")
-                else do
-                    agents <- readTVar registry.registryAgents
-                    parent <- resolveParentSTM
-                        agents parentId requestedParentPath requestedParentDepth
-                    case parent of
-                        Left err -> pure (Left err)
-                        Right (parentPath, nextDepth) -> do
-                            config <- readTVar registry.registryConfig
-                            case config.maxDepth of
-                                Just limit | nextDepth > limit ->
-                                    pure $ Left
-                                        ("Agent depth limit reached (maximum depth "
-                                            <> Text.pack (show limit)
-                                            <> "). Solve the task yourself.")
-                                _ -> case joinTaskPath parentPath taskName of
-                                    Left err -> pure (Left err)
-                                    Right childPath -> do
-                                        paths <- readTVar registry.registryPaths
-                                        if Map.member childPath paths
-                                            then pure $ Left $
-                                                "task path already in use: "
-                                                    <> taskPathText childPath
-                                            else do
-                                                live <- readTVar registry.registryLiveCount
-                                                if live >= config.maxConcurrent
-                                                    then pure $ Left $
-                                                        "Concurrent subagent limit reached: "
-                                                            <> Text.pack
-                                                                (show config.maxConcurrent)
-                                                            <> " agents are already active."
-                                                    else do
-                                                        let work = SubagentWork
-                                                                { workRootTurnId = rootTurnId
-                                                                , workMessage = InterAgentMessage
-                                                                    { messageAuthor =
-                                                                        taskPathText parentPath
-                                                                    , messageRecipient =
-                                                                        taskPathText childPath
-                                                                    , messageType = NewTaskMessage
-                                                                    , messageContent = content
-                                                                    }
-                                                                }
-                                                        phaseVar <- newTVar
-                                                            (AgentPending work)
-                                                        let record = SubagentRecord
-                                                                { recordId = agentId
-                                                                , recordParent = parentId
-                                                                , recordDepth = nextDepth
-                                                                , recordNickname = nickname
-                                                                , recordPhase = phaseVar
-                                                                , recordCancel = cancelFlag
-                                                                , recordMailbox = mailbox
-                                                                , recordAsync = asyncVar
-                                                                , recordPreviousResponseId = previousVar
-                                                                , recordLastUpdate = lastUpdateVar
-                                                                , recordTaskPath = childPath
-                                                                , recordCwd = childCwd
-                                                                }
-                                                        modifyTVar'
-                                                            registry.registryLiveCount (+ 1)
-                                                        writeTVar registry.registryAgents
-                                                            (Map.insert agentId record agents)
-                                                        writeTVar registry.registryPaths
-                                                            (Map.insert childPath agentId paths)
-                                                        pure (Right record)
+    admitted <- withMVar registry.registryLifecycle \_ ->
+        atomically
+            (runExceptT
+                (admit cancelFlag mailbox asyncVar previousVar lastUpdateVar))
     case admitted of
         Left err -> pure (Left err)
         Right record -> mask \restore ->
-            (do
-                prepared <- tryAny (restore (beforeStart agentId))
-                case prepared of
-                    Left (exc :: SomeException) -> do
-                        rollbackAdmission registry record
-                        pure $ Left $
-                            "Failed to prepare subagent: " <> Text.pack (show exc)
-                    Right lease ->
-                        startPrepared restore record lease)
+            runExceptT (prepareAndStart restore restore record)
                 `onException` rollbackAdmission registry record
   where
-    startPrepared restore record lease = do
+    admit
+        :: CancelFlag
+        -> TQueue SubagentWork
+        -> TVar (Maybe (Async ()))
+        -> TVar (Maybe Text)
+        -> TVar (Maybe (Int, SubagentStatus))
+        -> ExceptT Text STM SubagentRecord
+    admit cancelFlag mailbox asyncVar previousVar lastUpdateVar = do
+        closed <- lift (readTVar registry.registryClosed)
+        except (deny closed "Subagent registry is closed.")
+        aborted <- lift (isRootTurnAborted registry rootTurnId)
+        except (deny aborted "Root turn was aborted.")
+        agents <- lift (readTVar registry.registryAgents)
+        (parentPath, nextDepth) <-
+            ExceptT (resolveParentSTM agents parentId requestedParentPath requestedParentDepth)
+        config <- lift (readTVar registry.registryConfig)
+        except (depthLimit config nextDepth)
+        childPath <- except (joinTaskPath parentPath taskName)
+        paths <- lift (readTVar registry.registryPaths)
+        except (deny (Map.member childPath paths)
+            ("task path already in use: " <> taskPathText childPath))
+        live <- lift (readTVar registry.registryLiveCount)
+        except (deny (live >= config.maxConcurrent)
+            ("Concurrent subagent limit reached: "
+                <> Text.pack (show config.maxConcurrent)
+                <> " agents are already active."))
+        let work = SubagentWork
+                { workRootTurnId = rootTurnId
+                , workMessage = InterAgentMessage
+                    { messageAuthor =
+                        taskPathText parentPath
+                    , messageRecipient =
+                        taskPathText childPath
+                    , messageType = NewTaskMessage
+                    , messageContent = content
+                    }
+                }
+        phaseVar <- lift (newTVar (AgentPending work))
+        let record = SubagentRecord
+                { recordId = agentId
+                , recordParent = parentId
+                , recordDepth = nextDepth
+                , recordNickname = nickname
+                , recordPhase = phaseVar
+                , recordCancel = cancelFlag
+                , recordMailbox = mailbox
+                , recordAsync = asyncVar
+                , recordPreviousResponseId = previousVar
+                , recordLastUpdate = lastUpdateVar
+                , recordTaskPath = childPath
+                , recordCwd = childCwd
+                }
+        lift (modifyTVar' registry.registryLiveCount (+ 1))
+        lift (writeTVar registry.registryAgents (Map.insert agentId record agents))
+        lift (writeTVar registry.registryPaths (Map.insert childPath agentId paths))
+        pure record
+      where
+        deny condition message
+            | condition = Left message
+            | otherwise = Right ()
+
+        depthLimit :: SubagentConfig -> Int -> Either Text ()
+        depthLimit config nextDepth = case config.maxDepth of
+            Just limit | nextDepth > limit ->
+                Left
+                    ("Agent depth limit reached (maximum depth "
+                        <> Text.pack (show limit)
+                        <> "). Solve the task yourself.")
+            _ -> Right ()
+
+    prepareAndStart
+        :: (IO SubagentLease -> IO SubagentLease)
+        -> (IO (Either Text ()) -> IO (Either Text ()))
+        -> SubagentRecord
+        -> ExceptT Text IO (SubagentId, TaskPath)
+    prepareAndStart restoreLease restoreStart record = do
+        lease <- ExceptT $
+            tryAny (restoreLease (beforeStart agentId)) >>= \case
+                Left (exc :: SomeException) -> do
+                    rollbackAdmission registry record
+                    pure $ Left $ "Failed to prepare subagent: " <> Text.pack (show exc)
+                Right lease -> pure (Right lease)
+        ExceptT (startPrepared restoreStart record lease)
+
+    startPrepared
+        :: (IO (Either Text ()) -> IO (Either Text ()))
+        -> SubagentRecord
+        -> SubagentLease
+        -> IO (Either Text (SubagentId, TaskPath))
+    startPrepared restoreStart record lease = do
         started <-
-            restore
+            restoreStart
                 (withMVar registry.registryLifecycle \_ ->
                     startRecordSupervisor registry record lease)
                 `onException` shutdownRecord registry record

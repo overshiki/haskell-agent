@@ -30,6 +30,7 @@ import Agent.Provider
 import Agent.Json.Decode qualified as Hermes
 import Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import Control.Exception.Safe (tryIO)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy as LBS
@@ -284,47 +285,29 @@ upsertManagedCredentialAfterRefresh
 upsertManagedCredentialAfterRefresh credential secret =
     case managedCredentialEntry credential secret of
         Left err -> pure (Left err)
-        Right refreshedEntry -> do
-            home <- getHomeDirectory
-            withCredentialStoreLock home do
-                loaded <- loadManagedCredentialStoreUnlocked home
-                case loaded of
-                    Left err -> pure (Left err)
-                    Right store ->
-                        case find
-                            ((== credential.managedId) . (.entryManagedId))
-                            store.storeEntries of
-                            Nothing ->
-                                pure $ Left
-                                    ("managed credential "
-                                        <> credential.managedId
-                                        <> " no longer exists during refresh")
-                            Just current
-                                | not current.entryCredential.managedEnabled ->
-                                    pure $ Left
-                                        ("managed credential "
-                                            <> credential.managedId
-                                            <> " is disabled")
-                                | current.entryCredential.managedProvider
-                                    /= credential.managedProvider
-                                    || current.entryCredential.managedAuthKind
-                                        /= credential.managedAuthKind ->
-                                    pure $ Left
-                                        ("managed credential "
-                                            <> credential.managedId
-                                            <> " changed auth type during refresh")
-                                | otherwise -> do
-                                    let store' =
-                                            upsertStoreEntry refreshedEntry store
-                                    writePrivateJson
-                                        (managedSecretsPath home)
-                                        (secretsFile store')
-                                        >>= \case
-                                            Left err -> pure (Left err)
-                                            Right () ->
-                                                writePrivateJson
-                                                    (managedCredentialsPath home)
-                                                    (metadataFile store')
+        Right refreshedEntry ->
+            mutateStoreWith SecretsFirst \store ->
+                case find
+                    ((== credential.managedId) . (.entryManagedId))
+                    store.storeEntries of
+                    Nothing -> Left
+                        ("managed credential "
+                            <> credential.managedId
+                            <> " no longer exists during refresh")
+                    Just current
+                        | not current.entryCredential.managedEnabled -> Left
+                            ("managed credential "
+                                <> credential.managedId
+                                <> " is disabled")
+                        | current.entryCredential.managedProvider
+                            /= credential.managedProvider
+                            || current.entryCredential.managedAuthKind
+                                /= credential.managedAuthKind -> Left
+                            ("managed credential "
+                                <> credential.managedId
+                                <> " changed auth type during refresh")
+                        | otherwise ->
+                            Right (upsertStoreEntry refreshedEntry store)
 
 setManagedCredentialEnabled :: Text -> Bool -> IO (Either Text ())
 setManagedCredentialEnabled credentialId enabled =
@@ -338,21 +321,13 @@ setManagedCredentialEnabled credentialId enabled =
                 else entry
 
 updateManagedCredentialSecret :: Text -> Text -> IO (Either Text ())
-updateManagedCredentialSecret credentialId payload = do
-    home <- getHomeDirectory
-    withCredentialStoreLock home do
-        loaded <- loadManagedCredentialStoreUnlocked home
-        case loaded of
-            Left err -> pure (Left err)
-            Right store ->
-                case updateStoreEntries credentialId updateSecret store of
-                    Nothing -> pure $ Left
-                        ("managed credential secret " <> credentialId
-                            <> " no longer exists")
-                    Just store' ->
-                        writePrivateJson
-                            (managedSecretsPath home)
-                            (secretsFile store')
+updateManagedCredentialSecret credentialId payload =
+    mutateStoreWith SecretsOnly \store ->
+        maybe
+            (Left ("managed credential secret " <> credentialId
+                <> " no longer exists"))
+            Right
+            (updateStoreEntries credentialId updateSecret store)
   where
     updateSecret entry =
         entry
@@ -360,30 +335,11 @@ updateManagedCredentialSecret credentialId payload = do
                 entry.entrySecret { secretPayload = payload }
             }
 
--- New credentials must persist their secret before metadata can reference it.
--- An interrupted first write may leave an ignored orphan secret; the reverse
--- order can leave metadata without a secret and make the whole store unloadable.
--- Deletes keep using 'mutateStore', where metadata-first avoids that failure.
 mutateStoreSecretFirst
     :: (ManagedCredentialStore -> ManagedCredentialStore)
     -> IO (Either Text ())
-mutateStoreSecretFirst update = do
-    home <- getHomeDirectory
-    withCredentialStoreLock home do
-        loaded <- loadManagedCredentialStoreUnlocked home
-        case loaded of
-            Left err -> pure (Left err)
-            Right store -> do
-                let store' = update store
-                writePrivateJson
-                    (managedSecretsPath home)
-                    (secretsFile store')
-                    >>= \case
-                        Left err -> pure (Left err)
-                        Right () ->
-                            writePrivateJson
-                                (managedCredentialsPath home)
-                                (metadataFile store')
+mutateStoreSecretFirst update =
+    mutateStoreWith SecretsFirst (Right . update)
 
 deleteManagedCredential :: Text -> IO (Either Text ())
 deleteManagedCredential credentialId =
@@ -409,23 +365,48 @@ newManagedCredentialId provider accountId = do
 mutateStore
     :: (ManagedCredentialStore -> ManagedCredentialStore)
     -> IO (Either Text ())
-mutateStore update = do
+mutateStore update =
+    mutateStoreWith MetadataFirst (Right . update)
+
+-- Which store files a mutation persists, in write order. New credentials and
+-- refreshed secrets must persist their secret before metadata can reference
+-- it; an interrupted first write may leave an ignored orphan secret, while
+-- the reverse order can leave metadata without a secret and make the whole
+-- store unloadable. Deletes keep using 'MetadataFirst', where removing
+-- metadata before the secret avoids that failure.
+data StoreWrite
+    = SecretsFirst
+    | MetadataFirst
+    | SecretsOnly
+
+-- | Load the store under the credential lock, apply a pure mutation, then
+-- persist the requested files, stopping at the first write failure.
+mutateStoreWith
+    :: StoreWrite
+    -> (ManagedCredentialStore -> Either Text ManagedCredentialStore)
+    -> IO (Either Text ())
+mutateStoreWith mode update = do
     home <- getHomeDirectory
-    withCredentialStoreLock home do
-        loaded <- loadManagedCredentialStoreUnlocked home
-        case loaded of
-            Left err -> pure (Left err)
-            Right store -> do
-                let store' = update store
-                writeResult <- writePrivateJson
-                    (managedCredentialsPath home)
-                    (metadataFile store')
-                case writeResult of
-                    Left err -> pure (Left err)
-                    Right () ->
-                        writePrivateJson
-                            (managedSecretsPath home)
-                            (secretsFile store')
+    withCredentialStoreLock home (runExceptT (run home))
+  where
+    run :: OsPath -> ExceptT Text IO ()
+    run home = do
+        store <- ExceptT (loadManagedCredentialStoreUnlocked home)
+        store' <- except (update store)
+        case mode of
+            SecretsFirst -> do
+                writeSecrets home store'
+                writeMetadata home store'
+            MetadataFirst -> do
+                writeMetadata home store'
+                writeSecrets home store'
+            SecretsOnly -> writeSecrets home store'
+
+    writeSecrets home store' = ExceptT
+        (writePrivateJson (managedSecretsPath home) (secretsFile store'))
+
+    writeMetadata home store' = ExceptT
+        (writePrivateJson (managedCredentialsPath home) (metadataFile store'))
 
 withCredentialStoreLock :: OsPath -> IO a -> IO a
 withCredentialStoreLock home action =

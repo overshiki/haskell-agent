@@ -62,12 +62,14 @@ import Control.Exception.Safe
     , tryAny
     )
 import Control.Monad (unless)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT, withExceptT)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Aeson.KeyMap as AesonKeyMap
 import qualified Data.Aeson.Types as AesonTypes
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base64 as Base64
+import Data.Bifunctor (first)
 import Data.Char (isAlphaNum)
 import Data.IORef
     ( IORef
@@ -275,41 +277,34 @@ runImageGeneration
     -> RawJson
     -> IO (Either Text ToolHandlerResult)
 runImageGeneration baseUrl tokenProvider env history displayHooks call raw =
-    case Aeson.eitherDecodeStrict' (rawJsonBytes raw) of
-        Left err ->
-            pure (Left ("invalid imagegen arguments: " <> Text.pack err))
-        Right args ->
-            validateArgs args >>= \case
-                Left err -> pure (Left err)
-                Right () ->
-                    selectReferenceImages env history args >>= \case
-                        Left err -> pure (Left err)
-                        Right references -> do
-                            let (endpoint, requestBody) =
-                                    imageRequest args.prompt references
-                            response <- runWithTokenProvider tokenProvider \credential ->
-                                if credential.provider /= OpenAIProvider
-                                    then pure $ Left $ ProviderError
-                                        InvalidRequestError
-                                        "Image generation requires an OpenAI credential."
-                                        Nothing
-                                    else postCodexJson
-                                        baseUrl
-                                        endpoint
-                                        credential.accessToken
-                                        credential.accountId
-                                        (imageRequestHeaders call.callId)
-                                        requestBody
-                                        imageResponseHandler
-                            case response of
-                                Left err -> pure (Left (renderApiError err))
-                                Right encoded ->
-                                    finishGeneratedImage
-                                        env
-                                        history
-                                        displayHooks
-                                        call
-                                        encoded
+    runExceptT run
+  where
+    run :: ExceptT Text IO ToolHandlerResult
+    run = do
+        args <- except
+            ( first (("invalid imagegen arguments: " <>) . Text.pack)
+                (Aeson.eitherDecodeStrict' (rawJsonBytes raw))
+            )
+        ExceptT (validateArgs args)
+        references <- ExceptT (selectReferenceImages env history args)
+        let (endpoint, requestBody) = imageRequest args.prompt references
+        encoded <-
+            withExceptT renderApiError . ExceptT
+                $ runWithTokenProvider tokenProvider \credential ->
+                    if credential.provider /= OpenAIProvider
+                        then pure $ Left $ ProviderError
+                            InvalidRequestError
+                            "Image generation requires an OpenAI credential."
+                            Nothing
+                        else postCodexJson
+                            baseUrl
+                            endpoint
+                            credential.accessToken
+                            credential.accountId
+                            (imageRequestHeaders call.callId)
+                            requestBody
+                            imageResponseHandler
+        ExceptT (finishGeneratedImage env history displayHooks call encoded)
 
 validateArgs :: ImageGenerationArgs -> IO (Either Text ())
 validateArgs args

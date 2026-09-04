@@ -124,6 +124,8 @@ import Control.Monad
     ( forM_
     , when
     )
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT)
 import Data.IORef
     ( IORef
     , atomicModifyIORef'
@@ -741,55 +743,64 @@ validateAutomaticProviderTarget
     -> BillingMode
     -> ModelOption
     -> IO (Either Text (Maybe SelectedAccount))
-validateAutomaticProviderTarget cwd sourceBilling choice = do
-    let provider = choice.modelTarget.targetProvider
-    if not (providerSupportsUsageAccountSelection provider)
-        then fmap (Nothing <$) $
-            loadValidatedProviderTarget
-                probeLoadedAutomaticAvailability
-                choice
-        else do
-            projectRoot <- resolveProjectRoot cwd
-            settings <- loadProjectSettings projectRoot
-            let rememberedIds = fmap
-                    (\account ->
-                        ( account.projectAccountSelectionId
-                        , account.projectAccountId
-                        ))
-                    (projectAccountFor provider settings)
-                requiredBilling = case sourceBilling of
-                    SubscriptionBilled -> Just SubscriptionBilled
-                    ApiBilled -> Nothing
-            selectProviderAccount
-                provider
-                requiredBilling
-                rememberedIds >>= \case
-                    Left err -> pure (Left err)
-                    Right selected ->
-                        loadSelectedAccountAuth
-                            provider
-                            selected.selectedSelectionId
-                            selected.selectedAccountId >>= \case
-                                Left err -> pure (Left err)
-                                Right loaded ->
-                                    probeLoadedAutomaticAvailability loaded >>= \case
-                                        Left err -> do
-                                            now <- getCurrentTime
-                                            pure $ Left $
-                                                "cannot switch to "
-                                                    <> providerSlug provider
-                                                    <> ": "
-                                                    <> formatApiErrorInlineAt now err
-                                        Right usable
-                                            | allowsAutomaticBillingFallback
-                                                sourceBilling
-                                                (tokenProviderBillingMode
-                                                    usable.loadedTokenProvider) ->
-                                                    pure (Right (Just selected))
-                                            | otherwise ->
-                                                pure $ Left
-                                                    "automatic fallback from subscription \
-                                                    \billing to API credits is disabled"
+validateAutomaticProviderTarget cwd sourceBilling choice = runExceptT run
+  where
+    run :: ExceptT Text IO (Maybe SelectedAccount)
+    run = do
+        let provider = choice.modelTarget.targetProvider
+        if not (providerSupportsUsageAccountSelection provider)
+            then do
+                _ <- ExceptT
+                    ( loadValidatedProviderTarget
+                        probeLoadedAutomaticAvailability
+                        choice
+                    )
+                pure Nothing
+            else do
+                projectRoot <- liftIO (resolveProjectRoot cwd)
+                settings <- liftIO (loadProjectSettings projectRoot)
+                let rememberedIds = fmap
+                        (\account ->
+                            ( account.projectAccountSelectionId
+                            , account.projectAccountId
+                            ))
+                        (projectAccountFor provider settings)
+                    requiredBilling = case sourceBilling of
+                        SubscriptionBilled -> Just SubscriptionBilled
+                        ApiBilled -> Nothing
+                selected <- ExceptT
+                    ( selectProviderAccount
+                        provider
+                        requiredBilling
+                        rememberedIds
+                    )
+                loaded <- ExceptT
+                    ( loadSelectedAccountAuth
+                        provider
+                        selected.selectedSelectionId
+                        selected.selectedAccountId
+                    )
+                usable <- probeAutomatic provider loaded
+                if allowsAutomaticBillingFallback
+                    sourceBilling
+                    (tokenProviderBillingMode usable.loadedTokenProvider)
+                    then pure (Just selected)
+                    else except
+                        ( Left
+                            "automatic fallback from subscription \
+                            \billing to API credits is disabled"
+                        )
+
+    probeAutomatic provider loaded = ExceptT $ do
+        result <- probeLoadedAutomaticAvailability loaded
+        case result of
+            Right value -> pure (Right value)
+            Left err -> do
+                now <- getCurrentTime
+                pure (Left (cannotSwitch provider (formatApiErrorInlineAt now err)))
+
+    cannotSwitch provider message =
+        "cannot switch to " <> providerSlug provider <> ": " <> message
 
 loadValidatedProviderTarget
     :: (LoadedAuth -> IO (Either ApiError LoadedAuth))

@@ -16,6 +16,8 @@ import Agent.Concurrent (mapConcurrentlyBounded)
 import Agent.OsPath (relativeDisplayPath, toText, unsafeEncodeUtf, unsafeToFilePath)
 import Agent.Tools.Types (ToolEnv(..), addToolAllowedRoot)
 import Control.Exception.Safe (SomeException, try, tryAny, tryIO)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (ExceptT(..), except, runExceptT, withExceptT)
 import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -75,31 +77,51 @@ resolveWithRoots
     -> OsPath
     -> [OsPath]
     -> IO (Either Text OsPath)
-resolveWithRoots env requested extraRoots = do
-    resolveWithRootsAttempt env requested extraRoots >>= \case
-        Right resolved -> pure (Right resolved)
-        Left (OutsideAllowedRoots resolved) ->
-            readIORef env.toolRootAccessRequest >>= \case
-                Nothing -> pure $ Left (outsideRootsMessage requested)
-                Just requestAccess -> do
-                    root <- nearestExistingDirectory resolved
-                    case root of
-                        Nothing -> pure $ Left (outsideRootsMessage requested)
-                        Just requestedRoot ->
-                            tryAny (requestAccess requestedRoot) >>= \case
-                                Left exception ->
-                                    pure $ Left
-                                        ("Filesystem access request failed: "
-                                            <> Text.pack (show exception))
-                                Right False ->
-                                    pure $ Left (outsideRootsMessage requested)
-                                Right True -> do
-                                    addToolAllowedRoot env requestedRoot
-                                    resolveWithRootsAttempt env requested extraRoots >>= \case
-                                        Right value -> pure (Right value)
-                                        Left _ -> pure $
-                                            Left (outsideRootsMessage requested)
-        Left (ResolverFailure err) -> pure (Left err)
+resolveWithRoots env requested extraRoots = runExceptT run
+  where
+    run :: ExceptT Text IO OsPath
+    run = do
+        outcome <- liftIO (resolveWithRootsAttempt env requested extraRoots)
+        case outcome of
+            Right resolved -> pure resolved
+            Left (ResolverFailure err) -> except (Left err)
+            Left (OutsideAllowedRoots resolved) -> do
+                accessRequest <- liftIO (readIORef env.toolRootAccessRequest)
+                case accessRequest of
+                    Nothing -> except (Left (outsideRootsMessage requested))
+                    Just requestAccess -> do
+                        root <- liftIO (nearestExistingDirectory resolved)
+                        case root of
+                            Nothing ->
+                                except (Left (outsideRootsMessage requested))
+                            Just requestedRoot -> do
+                                granted <-
+                                    withExceptT
+                                        (\exception ->
+                                            "Filesystem access request failed: "
+                                                <> Text.pack (show exception))
+                                        . ExceptT
+                                        $ tryAny (requestAccess requestedRoot)
+                                if granted
+                                    then do
+                                        liftIO (addToolAllowedRoot env requestedRoot)
+                                        result <-
+                                            liftIO
+                                                ( resolveWithRootsAttempt
+                                                    env
+                                                    requested
+                                                    extraRoots
+                                                )
+                                        case result of
+                                            Right value -> pure value
+                                            Left _ ->
+                                                except
+                                                    ( Left
+                                                        ( outsideRootsMessage
+                                                            requested
+                                                        )
+                                                    )
+                                    else except (Left (outsideRootsMessage requested))
 
 data ResolveFailure
     = OutsideAllowedRoots !OsPath
