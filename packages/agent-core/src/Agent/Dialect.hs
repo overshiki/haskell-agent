@@ -212,6 +212,7 @@ dialectIdForModel provider model = case provider of
     XAIProvider -> GrokBuildDialect
     GeminiProvider -> GenericResponsesDialect
     DeepSeekProvider -> GenericResponsesDialect
+    KimiProvider -> GenericResponsesDialect
     ClaudeCodeProvider -> ClaudeCodeDialect
     OpenRouterProvider
         | "x-ai/" `Text.isPrefixOf` normalized -> GrokBuildDialect
@@ -234,6 +235,7 @@ legacyDialectIdForProvider = \case
     XAIProvider -> GrokBuildDialect
     OpenRouterProvider -> GrokBuildDialect
     DeepSeekProvider -> GenericResponsesDialect
+    KimiProvider -> GenericResponsesDialect
     GeminiProvider -> GenericResponsesDialect
     ClaudeCodeProvider -> ClaudeCodeDialect
 
@@ -248,6 +250,7 @@ providerSupportsDialect provider dialect = case provider of
     OpenRouterProvider -> dialect /= ClaudeCodeDialect
     GeminiProvider -> dialect == GenericResponsesDialect
     DeepSeekProvider -> dialect == GenericResponsesDialect
+    KimiProvider -> dialect == GenericResponsesDialect
     ClaudeCodeProvider -> dialect == ClaudeCodeDialect
 
 -- | Current public Grok Build names for stable internal tool identifiers.

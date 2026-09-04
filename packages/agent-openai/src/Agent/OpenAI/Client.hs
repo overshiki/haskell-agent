@@ -248,6 +248,9 @@ createCodexMessageWithProviderAtWithOptionsInternal options turnState
             DeepSeekProvider -> pure $ Left $ ProviderError ApiErrorType
                 "DeepSeek credentials must be used through agent-deepseek"
                 Nothing
+            KimiProvider -> pure $ Left $ ProviderError ApiErrorType
+                "Kimi credentials must be used through agent-kimi"
+                Nothing
             GeminiProvider -> pure $ Left $ ProviderError ApiErrorType
                 "Gemini credentials must be used through agent-gemini"
                 Nothing

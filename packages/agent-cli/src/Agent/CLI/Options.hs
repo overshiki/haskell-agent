@@ -186,6 +186,7 @@ defaultEffortFor = \case
     OpenAIProvider -> EffortMedium
     OpenRouterProvider -> EffortMedium
     DeepSeekProvider -> EffortMedium
+    KimiProvider -> EffortMedium
     GeminiProvider -> EffortMedium
     ClaudeCodeProvider -> EffortXHigh
 

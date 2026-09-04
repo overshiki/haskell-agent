@@ -96,6 +96,7 @@ loadAllAccountPickerOptions currentProvider = do
                 , XAIProvider
                 , OpenRouterProvider
                 , DeepSeekProvider
+                , KimiProvider
                 , GeminiProvider
                 , ClaudeCodeProvider
                 ]
@@ -116,13 +117,15 @@ loadAllAccountPickerOptions currentProvider = do
         XAIProvider -> 1
         OpenRouterProvider -> 2
         DeepSeekProvider -> 3
-        GeminiProvider -> 4
-        ClaudeCodeProvider -> 5
+        KimiProvider -> 4
+        GeminiProvider -> 5
+        ClaudeCodeProvider -> 6
 
 accountBillingMode :: Provider -> AccountBilling -> BillingMode
 accountBillingMode provider = case provider of
     OpenRouterProvider -> const ApiBilled
     DeepSeekProvider -> const ApiBilled
+    KimiProvider -> const ApiBilled
     ClaudeCodeProvider -> const SubscriptionBilled
     _ -> \case
         SubscriptionBilling _ -> SubscriptionBilled

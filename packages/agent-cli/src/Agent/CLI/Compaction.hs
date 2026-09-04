@@ -92,6 +92,8 @@ import qualified Agent.OpenRouter.Client as OpenRouter
 import qualified Agent.OpenRouter.Options as OpenRouter
 import qualified Agent.DeepSeek.Client as DeepSeek
 import qualified Agent.DeepSeek.Options as DeepSeek
+import qualified Agent.Kimi.Client as Kimi
+import qualified Agent.Kimi.Options as Kimi
 import qualified Agent.XAI.Client as XAI
 import qualified Agent.XAI.Options as XAI
 import Control.Monad.Trans.Class (lift)
@@ -214,6 +216,21 @@ runProviderCompactWithContextWindow contextWindow openAiSender recordUsage
                         (\request ->
                             runWithTokenProvider tokens \credential ->
                                 DeepSeek.createResponseWith
+                                    options credential request)
+                        params
+                        history
+                        focus
+        KimiProvider ->
+            case tokenProvider of
+                Nothing ->
+                    pure (compactTextFailure
+                        "kimi compact requires a token provider")
+                Just tokens -> do
+                    options <- Kimi.clientOptionsFromEnv
+                    summarizeTextAttempt
+                        (\request ->
+                            runWithTokenProvider tokens \credential ->
+                                Kimi.createResponseWith
                                     options credential request)
                         params
                         history

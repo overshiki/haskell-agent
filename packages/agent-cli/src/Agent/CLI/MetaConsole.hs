@@ -297,6 +297,7 @@ parseMetaProvider raw =
         "openrouter" -> Just OpenRouterProvider
         "open-router" -> Just OpenRouterProvider
         "deepseek" -> Just DeepSeekProvider
+        "kimi" -> Just KimiProvider
         "claude" -> Just ClaudeCodeProvider
         "claude-code" -> Just ClaudeCodeProvider
         _ -> Nothing

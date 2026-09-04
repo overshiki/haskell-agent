@@ -40,6 +40,9 @@ spec = describe "Agent.CLI.ModelConfig" do
         fmap (.catalogModelId)
             (catalogDefaultForProvider catalog DeepSeekProvider)
             `shouldBe` Just "deepseek-v4-flash"
+        fmap (.catalogModelId)
+            (catalogDefaultForProvider catalog KimiProvider)
+            `shouldBe` Just "kimi-k3"
         catalogContextWindowFor catalog "xai" "grok-4.6"
             `shouldBe` Just 500_000
         map (catalogContextWindowFor catalog "gemini")
@@ -51,6 +54,8 @@ spec = describe "Agent.CLI.ModelConfig" do
         catalogContextWindowFor catalog "openrouter" "stealth/ox-alpha"
             `shouldBe` Just 1_048_576
         catalogContextWindowFor catalog "deepseek" "deepseek-v4-flash"
+            `shouldBe` Just 1_048_576
+        catalogContextWindowFor catalog "kimi" "kimi-k3"
             `shouldBe` Just 1_048_576
         fmap (.catalogModelId)
             (catalogModelsForConnection "openai" catalog)
@@ -65,6 +70,14 @@ spec = describe "Agent.CLI.ModelConfig" do
                 [ "gemini-3.7-flash"
                 , "gemini-3.1-pro-preview"
                 , "gemini-3.5-flash-lite"
+                ]
+        fmap (.catalogModelId)
+            (catalogModelsForConnection "kimi" catalog)
+            `shouldBe`
+                [ "kimi-k3"
+                , "kimi-k2.7-code"
+                , "kimi-k2.7-code-highspeed"
+                , "kimi-k2.6"
                 ]
 
     it "adds a custom Responses connection and model" do

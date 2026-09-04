@@ -107,6 +107,7 @@ providerLabel = \case
     XAIProvider -> "xai"
     OpenRouterProvider -> "openrouter"
     DeepSeekProvider -> "deepseek"
+    KimiProvider -> "kimi"
     GeminiProvider -> "gemini"
     ClaudeCodeProvider -> "claude-code"
 

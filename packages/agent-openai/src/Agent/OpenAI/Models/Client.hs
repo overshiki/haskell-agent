@@ -139,6 +139,9 @@ listModelsWithCredentialAt baseUrl clientVersion knownEtag credential =
         DeepSeekProvider -> pure $ Left $ ProviderError ApiErrorType
             "DeepSeek credentials must be used through agent-deepseek"
             Nothing
+        KimiProvider -> pure $ Left $ ProviderError ApiErrorType
+            "Kimi credentials must be used through agent-kimi"
+            Nothing
         GeminiProvider -> pure $ Left $ ProviderError ApiErrorType
             "Gemini credentials must be used through agent-gemini"
             Nothing
@@ -210,6 +213,7 @@ modelsCacheKeyForCredential baseUrl credential = ModelsCacheKey
         XAIProvider -> "xai"
         OpenRouterProvider -> "openrouter"
         DeepSeekProvider -> "deepseek"
+        KimiProvider -> "kimi"
         GeminiProvider -> "gemini"
         ClaudeCodeProvider -> "claude-code"
     , baseUrl

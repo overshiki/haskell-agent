@@ -115,6 +115,7 @@ import Agent.CLI.Turn ()
 import Agent.CLI.Usage
     ( formatDeepSeekLimitStatus,
       formatGrokLimitStatus,
+      formatKimiLimitStatus,
       formatOpenAiLimitStatus,
       formatOpenRouterLimitStatus )
 import Agent.CLI.WebFetch ()
@@ -134,7 +135,7 @@ import Agent.OpenRouter.LoopBackend ()
 import Agent.OsPath ()
 import Agent.Provider
     ( Provider(OpenRouterProvider, XAIProvider, OpenAIProvider,
-               DeepSeekProvider),
+               DeepSeekProvider, KimiProvider),
       Credential(accessToken, accountId),
       getNextToken,
       tokenProviderBillingMode,
@@ -190,6 +191,8 @@ import qualified Agent.OpenRouter.Usage as OpenRouterUsage
     ( fetchOpenRouterUsage )
 import qualified Agent.DeepSeek.Usage as DeepSeekUsage
     ( fetchDeepSeekUsage )
+import qualified Agent.Kimi.Usage as KimiUsage
+    ( fetchKimiUsage )
 import qualified Agent.Provider as Provider ()
 import qualified Agent.CLI.Session.Lifecycle as SessionLifecycle
     ( finishTurn, retryFailedTurn, runPendingTurn )
@@ -436,6 +439,16 @@ replWithDraft env@SessionEnv
                                 Right snapshot ->
                                     publish
                                         (formatDeepSeekLimitStatus snapshot)
+            (KimiProvider, Just tokens) ->
+                getNextToken tokens Nothing >>= \case
+                    Left _ -> pure ()
+                    Right credential ->
+                        KimiUsage.fetchKimiUsage
+                            credential.accessToken >>= \case
+                                Left _ -> pure ()
+                                Right snapshot ->
+                                    publish
+                                        (formatKimiLimitStatus snapshot)
             _ -> pure ()
       where
         refreshWith tokens fetch formatStatus =

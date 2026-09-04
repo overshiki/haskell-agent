@@ -309,6 +309,17 @@
                     ];
                 };
 
+                agentKimiSource = nix-filter.lib {
+                    root = ./packages/agent-kimi;
+                    include = [
+                        "src"
+                        "test"
+                        "agent-kimi.cabal"
+                        "LICENSE"
+                        "README.md"
+                    ];
+                };
+
                 skylightingSyntaxes = pkgs.runCommand "skylighting-syntaxes" { } ''
                     mkdir -p "$out/share/skylighting/xml"
                     cp ${skylighting}/skylighting-core/xml/*.xml \
@@ -482,6 +493,9 @@
                         agent-deepseek = localPackage (pkgs.haskell.lib.overrideSrc (final.callPackage ./packages/agent-deepseek/package.nix { }) {
                             src = agentDeepseekSource;
                         });
+                        agent-kimi = localPackage (pkgs.haskell.lib.overrideSrc (final.callPackage ./packages/agent-kimi/package.nix { }) {
+                            src = agentKimiSource;
+                        });
                         agent-gemini = localPackage (pkgs.haskell.lib.overrideSrc (final.callPackage ./packages/agent-gemini/package.nix { }) {
                             src = agentGeminiSource;
                         });
@@ -561,6 +575,7 @@
                 agentXaiPackage = productionHaskellPackages.agent-xai;
                 agentOpenrouterPackage = productionHaskellPackages.agent-openrouter;
                 agentDeepseekPackage = productionHaskellPackages.agent-deepseek;
+                agentKimiPackage = productionHaskellPackages.agent-kimi;
                 agentGeminiPackage = productionHaskellPackages.agent-gemini;
                 claudeAgentSdkHaskellPackage = productionHaskellPackages.claude-agent-sdk-haskell;
                 agentClaudePackage = productionHaskellPackages.agent-claude;
@@ -794,6 +809,7 @@
                 packages.agent-xai = agentXaiPackage;
                 packages.agent-openrouter = agentOpenrouterPackage;
                 packages.agent-deepseek = agentDeepseekPackage;
+                packages.agent-kimi = agentKimiPackage;
                 packages.agent-gemini = agentGeminiPackage;
                 packages.claude-agent-sdk-haskell = claudeAgentSdkHaskellPackage;
                 packages.agent-claude = agentClaudePackage;
@@ -831,6 +847,7 @@
                         packages.agent-xai
                         packages.agent-openrouter
                         packages.agent-deepseek
+                        packages.agent-kimi
                         packages.agent-gemini
                         packages.claude-agent-sdk-haskell
                         packages.agent-claude
@@ -884,6 +901,7 @@
                     agent-xai = haskellPackages.agent-xai;
                     agent-openrouter = haskellPackages.agent-openrouter;
                     agent-deepseek = haskellPackages.agent-deepseek;
+                    agent-kimi = haskellPackages.agent-kimi;
                     agent-gemini = haskellPackages.agent-gemini;
                     claude-agent-sdk-haskell =
                         haskellPackages.claude-agent-sdk-haskell;

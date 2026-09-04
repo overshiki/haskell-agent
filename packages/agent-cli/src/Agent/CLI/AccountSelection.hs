@@ -62,6 +62,7 @@ providerSupportsUsageAccountSelection = \case
     XAIProvider -> True
     OpenRouterProvider -> True
     DeepSeekProvider -> True
+    KimiProvider -> True
     GeminiProvider -> False
     ClaudeCodeProvider -> False
 
@@ -193,7 +194,9 @@ selectCandidates remembered candidates =
 
 -- | Provider-local capacity score. Subscription accounts use their tightest
 -- active percentage window. Credit accounts use known remaining credit/key
--- capacity. Missing capacity data is treated as unverifiable.
+-- capacity. A verified account with no reported capacity (e.g. a Kimi key,
+-- which has no balance endpoint) stays usable at a neutral minimum score;
+-- only unverifiable accounts report no capacity.
 accountCapacity :: LoginAccount -> Maybe Double
 accountCapacity account = case account.loginUsage of
     UsageNotChecked -> Nothing
@@ -211,7 +214,7 @@ accountCapacity account = case account.loginUsage of
                     , isFreeTier usage -> Just 1
                     | remaining <= 0 -> Nothing
                     | otherwise -> Just remaining
-                Nothing -> Nothing
+                Nothing -> Just 1
 
 isFreeTier :: AccountUsage -> Bool
 isFreeTier usage =

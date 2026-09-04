@@ -91,6 +91,8 @@ credentialAccountLabel credential = case credential.provider of
         fallback "OpenRouter"
     DeepSeekProvider ->
         fallback "DeepSeek"
+    KimiProvider ->
+        fallback "Kimi"
     GeminiProvider ->
         fallback "Google Gemini"
     ClaudeCodeProvider ->
@@ -113,6 +115,7 @@ credentialEmail credential = case credential.provider of
     XAIProvider -> XAIAuth.emailFromToken credential.accessToken
     OpenRouterProvider -> Nothing
     DeepSeekProvider -> Nothing
+    KimiProvider -> Nothing
     GeminiProvider -> Nothing
     ClaudeCodeProvider -> Nothing
 

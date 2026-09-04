@@ -21,6 +21,10 @@
       "api": "builtin",
       "provider": "deepseek"
     },
+    "kimi": {
+      "api": "builtin",
+      "provider": "kimi"
+    },
     "meta": {
       "api": "responses",
       "base_url": "https://api.meta.ai/v1",
@@ -124,6 +128,36 @@
       "dialect": "generic-responses",
       "context_window": 1048576,
       "label": "vision · 1M context"
+    },
+    {
+      "id": "kimi-k3",
+      "connection": "kimi",
+      "dialect": "generic-responses",
+      "context_window": 1048576,
+      "label": "default · 1M context",
+      "default": true,
+      "fallback_priority": 20
+    },
+    {
+      "id": "kimi-k2.7-code",
+      "connection": "kimi",
+      "dialect": "generic-responses",
+      "context_window": 262144,
+      "label": "coding"
+    },
+    {
+      "id": "kimi-k2.7-code-highspeed",
+      "connection": "kimi",
+      "dialect": "generic-responses",
+      "context_window": 262144,
+      "label": "coding · high speed"
+    },
+    {
+      "id": "kimi-k2.6",
+      "connection": "kimi",
+      "dialect": "generic-responses",
+      "context_window": 262144,
+      "label": "reasoning"
     },
     {
       "id": "muse-spark-1.2",

@@ -5,6 +5,7 @@ module Agent.CLI.Usage
     , formatDeepSeekLimitStatus
     , formatDuration
     , formatGrokLimitStatus
+    , formatKimiLimitStatus
     , formatOpenAiLimitStatus
     , formatOpenRouterLimitStatus
     , formatUsageReport
@@ -17,6 +18,7 @@ import Agent.CLI.Duration (formatDuration)
 import Agent.CLI.Error (formatApiErrorInlineAt)
 import Agent.CLI.Style (roleMuted, roleSuccess, roleWarn)
 import Agent.DeepSeek.Usage (DeepSeekUsage(..))
+import Agent.Kimi.Usage (KimiUsage(..))
 import Agent.Error (ApiError)
 import Agent.OpenAI.Usage (UsageLimit(..), UsageSnapshot(..), UsageWindow(..))
 import Agent.OpenRouter.Usage (OpenRouterUsage(..))
@@ -84,6 +86,15 @@ formatDeepSeekLimitStatus usage = do
     amount <- readMaybe (Text.unpack balance)
     let remaining = max 0 (amount :: Scientific)
     pure (amountLimitStatus "Balance left" remaining (remaining <= 0))
+
+-- | Kimi's key-validation endpoint only confirms the key stays usable; it
+-- exposes no balance or window data, so the status is a plain label.
+formatKimiLimitStatus :: KimiUsage -> Maybe PromptLimitStatus
+formatKimiLimitStatus _ =
+    Just PromptLimitStatus
+        { promptLimitText = "Kimi (Moonshot) connected"
+        , promptLimitWarning = False
+        }
 
 percentLimitStatus :: Text -> Int -> PromptLimitStatus
 percentLimitStatus label remaining =

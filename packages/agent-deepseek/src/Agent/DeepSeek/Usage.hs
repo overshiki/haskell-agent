@@ -15,6 +15,8 @@ import qualified Data.Text.Encoding as Text
 import qualified Network.HTTP.Client as HttpClient
 import Network.HTTP.Simple
 
+import Agent.DeepSeek.Options (ClientOptions(..), clientOptionsFromEnv)
+
 -- | Account balance reported for a validated DeepSeek API key. All fields are
 -- optional: a valid key whose balance cannot be read still yields a 'Right'.
 data DeepSeekUsage = DeepSeekUsage
@@ -58,19 +60,21 @@ decodeBalances body = case Json.decodeEither balancesDecoder (LBS.toStrict body)
 --
 -- The key is validated against @GET /models@; the balance is then read from
 -- @GET /user/balance@. A key that validates but has an unreadable balance
--- still reports success with empty balance fields.
+-- still reports success with empty balance fields. Both requests use the
+-- configured base URL (@DEEPSEEK_BASE_URL@ when set, otherwise the default).
 fetchDeepSeekUsage :: Text -> IO (Either Text DeepSeekUsage)
 fetchDeepSeekUsage apiKey = do
-    keyResult <- fetch "/models" (Right . const ())
+    options <- clientOptionsFromEnv
+    keyResult <- fetch options.baseUrl "/models" (Right . const ())
     case keyResult of
         Left err -> pure (Left err)
         Right () -> do
-            balanceResult <- fetch "/user/balance" decodeBalances
+            balanceResult <- fetch options.baseUrl "/user/balance" decodeBalances
             pure $ Right $ usageFromBalances $ either (const []) id balanceResult
   where
-    fetch path decode = do
+    fetch baseUrl path decode = do
         result <- tryAny do
-            request <- parseRequest (defaultBaseUrl <> path)
+            request <- parseRequest (baseUrl <> path)
             httpLBS
                 $ setRequestHeader
                     "Authorization"
@@ -106,6 +110,3 @@ usageFromBalances balances = DeepSeekUsage
     firstOf field = case balances of
         (balance : _) -> field balance
         [] -> Nothing
-
-defaultBaseUrl :: String
-defaultBaseUrl = "https://api.deepseek.com"

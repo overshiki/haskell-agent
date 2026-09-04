@@ -118,6 +118,8 @@ import Agent.Provider
 import Agent.OpenRouter.Credential (credentialFromApiKey)
 import qualified Agent.DeepSeek.Credential as DeepSeek
     ( credentialFromApiKey, credentialFromEnv )
+import qualified Agent.Kimi.Credential as Kimi
+    ( credentialFromApiKey, credentialFromEnv )
 import qualified Agent.Gemini.Auth as GeminiAuth
 import qualified Agent.Gemini.Credential as GeminiCredential
 import qualified Agent.XAI.Auth as XAIAuth
@@ -201,6 +203,7 @@ loadDetectedSubscriptionProvider =
         , XAIProvider
         , OpenRouterProvider
         , DeepSeekProvider
+        , KimiProvider
         , GeminiProvider
         ]
   where
@@ -233,6 +236,7 @@ loadProvider provider = runExceptT do
         OpenAIProvider -> loadOpenAi
         OpenRouterProvider -> loadOpenRouter Nothing
         DeepSeekProvider -> loadDeepSeek Nothing
+        KimiProvider -> loadKimi Nothing
         GeminiProvider -> loadGemini Nothing
         ClaudeCodeProvider -> loadClaudeCode
 
@@ -375,6 +379,7 @@ loadAuthForAccount provider selectionId =
         XAIProvider -> loadXai (Just selectionId)
         OpenRouterProvider -> loadOpenRouter (Just selectionId)
         DeepSeekProvider -> loadDeepSeek (Just selectionId)
+        KimiProvider -> loadKimi (Just selectionId)
         GeminiProvider -> loadGemini (Just selectionId)
         OpenAIProvider ->
             throwE "OpenAI account selection is handled by the live account pool"
@@ -435,6 +440,7 @@ detectProvider Nothing = do
     openai <- lift hasOpenAiAuth
     openrouter <- lift hasOpenRouterAuth
     deepseek <- lift hasDeepSeekAuth
+    kimi <- lift hasKimiAuth
     gemini <- lift hasGeminiAuth
     if openai
         then pure OpenAIProvider
@@ -444,9 +450,11 @@ detectProvider Nothing = do
                 then pure OpenRouterProvider
                 else if deepseek
                     then pure DeepSeekProvider
-                    else if gemini
-                        then pure GeminiProvider
-                        else throwE noAuthHint
+                    else if kimi
+                        then pure KimiProvider
+                        else if gemini
+                            then pure GeminiProvider
+                            else throwE noAuthHint
 
 loadXai :: Maybe Text -> ExceptT Text IO LoadedAuth
 loadXai requestedSelectionId = do
@@ -681,6 +689,73 @@ loadDeepSeek requestedSelectionId = do
                 , loadedOpenAiPool = Nothing
                 }
 
+loadKimiCredential
+    :: Maybe Text
+    -> IO (Maybe (Text, Credential, Text))
+loadKimiCredential requestedSelectionId = do
+    managed <- loadManagedCredential KimiProvider requestedSelectionId
+    case managed of
+        Just (metadata, secret)
+            | metadata.managedAuthKind == ManagedBearerToken ->
+                pure $ Just
+                    ( managedAuthSelectionId metadata.managedId
+                    , (Kimi.credentialFromApiKey secret.secretPayload)
+                        { accountId = metadata.managedAccountId }
+                    , metadata.managedLabel
+                    )
+        Just _ -> pure Nothing
+        Nothing -> do
+            external <- fmap
+                (\credential ->
+                    ( externalAuthSelectionId
+                        KimiProvider
+                        "environment"
+                    , credential { accountId = "kimi" }
+                    , ""
+                    ))
+                <$> Kimi.credentialFromEnv
+            pure $ external >>= \candidate@(selectionId, credential, _) ->
+                if matchesSelection
+                    requestedSelectionId
+                    selectionId
+                    credential
+                then Just candidate
+                else Nothing
+
+loadKimi :: Maybe Text -> ExceptT Text IO LoadedAuth
+loadKimi requestedSelectionId = do
+    loadedCredential <- lift (loadKimiCredential requestedSelectionId)
+    case loadedCredential of
+        Nothing ->
+            throwE $
+                maybe noAuthHint
+                    (const
+                        (accountNotFound
+                            KimiProvider requestedSelectionId))
+                    requestedSelectionId
+        Just (selectionId, initial, initialLabel) -> do
+            provider <- lift $ reloadableFileCredentialProvider
+                KimiProvider
+                ApiBilled
+                initial
+                (fmap (\(_, credential, _) -> credential)
+                    <$> loadKimiCredential (Just selectionId))
+            pure LoadedAuth
+                { loadedProvider = KimiProvider
+                , loadedTokenProvider = provider
+                , loadedAccountLabel = \credential -> do
+                    current <- loadKimiCredential (Just selectionId)
+                    let label = case current of
+                            Just (_, currentCredential, currentLabel)
+                                | currentCredential.accountId
+                                    == credential.accountId ->
+                                        currentLabel
+                            _ -> initialLabel
+                    pure (credentialAccountLabelWith label credential)
+                , loadedSelectionId = Just selectionId
+                , loadedOpenAiPool = Nothing
+                }
+
 loadGeminiCredential
     :: Maybe Text
     -> IO (Maybe (Text, Credential, Text))
@@ -851,6 +926,13 @@ hasDeepSeekAuth = do
     environment <- isJust <$> lookupNonEmpty "DEEPSEEK_API_KEY"
     managed <- hasManagedProvider DeepSeekProvider
     pure (environment || managed)
+
+hasKimiAuth :: IO Bool
+hasKimiAuth = do
+    moonshot <- isJust <$> lookupNonEmpty "MOONSHOT_API_KEY"
+    kimi <- isJust <$> lookupNonEmpty "KIMI_API_KEY"
+    managed <- hasManagedProvider KimiProvider
+    pure (moonshot || kimi || managed)
 
 hasGeminiAuth :: IO Bool
 hasGeminiAuth = do

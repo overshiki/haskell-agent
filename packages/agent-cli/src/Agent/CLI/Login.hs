@@ -117,6 +117,7 @@ import Agent.OsPath (toText, unsafeToFilePath)
 import qualified Agent.OpenAI.Usage as OpenAI
 import qualified Agent.OpenRouter.Usage as OpenRouter
 import qualified Agent.DeepSeek.Usage as DeepSeek
+import qualified Agent.Kimi.Usage as Kimi
 import qualified Agent.Gemini.Auth as GeminiAuth
 import Agent.Provider
     ( BillingMode(..)
@@ -449,7 +450,7 @@ loginDashboardEntries
 loginDashboardEntries accounts =
     [ ( LoginDashboardConnect
       , ( "＋ Connect account"
-        , "OpenAI, xAI / Grok, OpenRouter, DeepSeek, Google Gemini, or Claude Code"
+        , "OpenAI, xAI / Grok, OpenRouter, DeepSeek, Kimi, Google Gemini, or Claude Code"
         )
       )
     , ( LoginDashboardGateway
@@ -1144,6 +1145,7 @@ discoverLoginAccountSources = do
         (home </> unsafeEncodeUtf ".grok" </> unsafeEncodeUtf "auth.json")
     openRouter <- discoverOpenRouter
     deepseek <- discoverDeepSeek
+    kimi <- discoverKimi
     gemini <- discoverGemini
     managed <- loadManagedCredentials
     gateway <- loadGatewayLoginAccount
@@ -1159,6 +1161,7 @@ discoverLoginAccountSources = do
                 , grokFile
                 , openRouter
                 , deepseek
+                , kimi
                 , gemini
                 ]
 
@@ -1227,6 +1230,7 @@ managedLoginAccount now (metadata, secret) =
             ManagedGeminiAuthJson -> Nothing
         OpenRouterProvider -> Nothing
         DeepSeekProvider -> Nothing
+        KimiProvider -> Nothing
         GeminiProvider -> case metadata.managedAuthKind of
             ManagedGeminiAuthJson ->
                 (.email) <$> geminiAuth
@@ -1431,6 +1435,7 @@ connectProviderAccount color = \case
     XAIProvider -> connectXAI color
     OpenRouterProvider -> connectOpenRouter color
     DeepSeekProvider -> connectDeepSeek color
+    KimiProvider -> connectKimi color
     GeminiProvider -> connectGemini color
     ClaudeCodeProvider -> do
         printLoginMessage color False
@@ -1446,6 +1451,7 @@ pickConnectProvider color =
         , XAIProvider
         , OpenRouterProvider
         , DeepSeekProvider
+        , KimiProvider
         , GeminiProvider
         , ClaudeCodeProvider
         ]
@@ -1498,6 +1504,9 @@ connectFullscreenAccount runtime = do
         , ( DeepSeekProvider
           , ("DeepSeek", "Add a masked API key and inspect credits")
           )
+        , ( KimiProvider
+          , ("Kimi (Moonshot)", "Add a masked API key")
+          )
         , ( GeminiProvider
           , ("Google Gemini", "Connect a Google account with OAuth")
           )
@@ -1515,6 +1524,7 @@ connectFullscreenProvider runtime = \case
     XAIProvider -> connectXAIFullscreen runtime
     OpenRouterProvider -> connectOpenRouterFullscreen runtime
     DeepSeekProvider -> connectDeepSeekFullscreen runtime
+    KimiProvider -> connectKimiFullscreen runtime
     GeminiProvider -> connectGeminiFullscreen runtime
     ClaudeCodeProvider ->
         pure $
@@ -1841,6 +1851,44 @@ connectDeepSeekFullscreen runtime =
               where
                 apiKey = Text.strip rawKey
 
+connectKimiFullscreen
+    :: FullscreenRuntime
+    -> IO (Maybe (Either Text Text))
+connectKimiFullscreen runtime =
+    requestFullscreenSecret
+        runtime
+        "Connect Kimi (Moonshot)"
+        ( "Paste a Kimi (Moonshot) API key. Input is masked and is never added "
+            <> "to the conversation transcript."
+        )
+        >>= \case
+            Nothing -> pure Nothing
+            Just rawKey
+                | Text.null apiKey -> pure Nothing
+                | otherwise -> do
+                    fetched <-
+                        withLoginProgress runtime "Validating Kimi key…" $
+                            Kimi.fetchKimiUsage apiKey
+                    case fetched of
+                        Left err ->
+                            pure $
+                                Just $
+                                    Left ("Kimi rejected the key: " <> err)
+                        Right usage -> do
+                            let accountId =
+                                    fromMaybe "kimi" usage.keyLabel
+                                label =
+                                    fromMaybe "Kimi" usage.keyLabel
+                            Just <$> storeConnectedCredentialResult
+                                KimiProvider
+                                accountId
+                                label
+                                ApiBilled
+                                ManagedBearerToken
+                                apiKey
+              where
+                apiKey = Text.strip rawKey
+
 connectGeminiFullscreen
     :: FullscreenRuntime
     -> IO (Maybe (Either Text Text))
@@ -2087,6 +2135,34 @@ connectDeepSeek color =
                             fromMaybe "DeepSeek" usage.keyLabel
                     storeConnectedCredential color
                         DeepSeekProvider
+                        accountId
+                        label
+                        ApiBilled
+                        ManagedBearerToken
+                        apiKey
+                        >>= \stored ->
+                            pure $
+                                if stored
+                                    then Just accountId
+                                    else Nothing
+
+connectKimi :: Bool -> IO (Maybe Text)
+connectKimi color =
+    readSecretLine "Kimi (Moonshot) API key: " >>= \case
+        Nothing -> pure Nothing
+        Just apiKey ->
+            Kimi.fetchKimiUsage apiKey >>= \case
+                Left err ->
+                    printLoginMessage color False
+                        ("Kimi rejected the key: " <> err)
+                        >> pure Nothing
+                Right usage -> do
+                    let accountId =
+                            fromMaybe "kimi" usage.keyLabel
+                        label =
+                            fromMaybe "Kimi" usage.keyLabel
+                    storeConnectedCredential color
+                        KimiProvider
                         accountId
                         label
                         ApiBilled
@@ -2351,6 +2427,26 @@ discoverDeepSeek = do
             , loginEnabled = True
             }
 
+discoverKimi :: IO (Maybe LoginAccount)
+discoverKimi = do
+    moonshot <- lookupNonEmpty "MOONSHOT_API_KEY"
+    kimi <- lookupNonEmpty "KIMI_API_KEY"
+    pure $ do
+        accessToken <- moonshot <|> kimi
+        pure LoginAccount
+            { loginManagedId = Nothing
+            , loginProvider = KimiProvider
+            , loginAccountId = "kimi"
+            , loginLabel = "Kimi (Moonshot)"
+            , loginBilling = ApiCreditsBilling
+            , loginSource = "environment"
+            , loginUsage = UsageNotChecked
+            , loginAccessToken = accessToken
+            , loginAuthKind = ManagedBearerToken
+            , loginSecretPayload = accessToken
+            , loginEnabled = True
+            }
+
 discoverGemini :: IO (Maybe LoginAccount)
 discoverGemini = do
     googleKey <- lookupNonEmpty "GOOGLE_API_KEY"
@@ -2555,6 +2651,23 @@ refreshLoginAccount account
                                 { usagePlan = Nothing
                                 , usageWindows = []
                                 , creditsRemaining = snapshot.totalBalance
+                                , creditsUsed = Nothing
+                                }
+                        }
+        KimiProvider ->
+            Kimi.fetchKimiUsage account.loginAccessToken >>= \case
+                Left err ->
+                    pure account
+                        { loginUsage = UsageUnavailable err }
+                Right snapshot ->
+                    pure account
+                        { loginLabel =
+                            fromMaybe account.loginLabel snapshot.keyLabel
+                        , loginUsage =
+                            UsageAvailable AccountUsage
+                                { usagePlan = Nothing
+                                , usageWindows = []
+                                , creditsRemaining = Nothing
                                 , creditsUsed = Nothing
                                 }
                         }

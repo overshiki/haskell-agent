@@ -156,6 +156,20 @@ spec = describe "account selection" do
                 })
             `shouldBe` Nothing
 
+    it "keeps a verified key-only Kimi account usable without balance data" do
+        accountCapacity
+            ((subscriptionAccount "kimi-env" "kimi" 0)
+                { loginProvider = KimiProvider
+                , loginBilling = ApiCreditsBilling
+                , loginUsage = UsageAvailable AccountUsage
+                    { usagePlan = Nothing
+                    , usageWindows = []
+                    , creditsRemaining = Nothing
+                    , creditsUsed = Nothing
+                    }
+                })
+            `shouldBe` Just 1
+
 candidate :: Text -> Text -> Maybe Double -> AccountCandidate
 candidate selectionId accountId capacity = AccountCandidate
     { candidateProvider = OpenAIProvider

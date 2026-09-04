@@ -39,6 +39,8 @@ spec = describe "Agent.Dialect" do
                 `shouldBe` GenericResponsesDialect
             dialectIdForModel DeepSeekProvider "arbitrary-model"
                 `shouldBe` GenericResponsesDialect
+            dialectIdForModel KimiProvider "arbitrary-model"
+                `shouldBe` GenericResponsesDialect
             dialectIdForModel ClaudeCodeProvider "arbitrary-model"
                 `shouldBe` ClaudeCodeDialect
 
@@ -70,6 +72,8 @@ spec = describe "Agent.Dialect" do
                 `shouldBe` GenericResponsesDialect
             legacyDialectIdForProvider DeepSeekProvider
                 `shouldBe` GenericResponsesDialect
+            legacyDialectIdForProvider KimiProvider
+                `shouldBe` GenericResponsesDialect
             legacyDialectIdForProvider ClaudeCodeProvider
                 `shouldBe` ClaudeCodeDialect
 
@@ -90,6 +94,10 @@ spec = describe "Agent.Dialect" do
             providerSupportsDialect DeepSeekProvider GenericResponsesDialect
                 `shouldBe` True
             providerSupportsDialect DeepSeekProvider CodexDialect
+                `shouldBe` False
+            providerSupportsDialect KimiProvider GenericResponsesDialect
+                `shouldBe` True
+            providerSupportsDialect KimiProvider CodexDialect
                 `shouldBe` False
             providerSupportsDialect ClaudeCodeProvider ClaudeCodeDialect
                 `shouldBe` True

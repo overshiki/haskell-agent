@@ -197,6 +197,9 @@ runCredentialOnboarding startup runtime = do
         , ( DeepSeekProvider
           , ("Add a DeepSeek API key", "Use API credits")
           )
+        , ( KimiProvider
+          , ("Add a Kimi (Moonshot) API key", "Use API credits")
+          )
         , ( GeminiProvider
           , ("Sign in with Google", "Use Gemini with your Google account")
           )
