@@ -6,8 +6,14 @@ An independent agent harness, written in Haskell.
 
 ## Try it out
 
+Build from source (requires [GHC](https://www.haskell.org/ghcup/) and `cabal`):
+
 ```bash
-nix run --accept-flake-config "github:digitallyinduced/haskell-agent"
+git clone https://github.com/overshiki/haskell-agent.git
+cd haskell-agent
+scripts/setup-cabal-build.sh
+cabal install agent-cli:exe:monad-cli
+monad-cli
 ```
 
 ## Supported LLM Providers
@@ -16,6 +22,8 @@ nix run --accept-flake-config "github:digitallyinduced/haskell-agent"
 - xAI (Subscription)
 - Claude (Subscription)
 - OpenRouter (API billing)
+- DeepSeek (API billing)
+- Kimi (Moonshot, API billing)
 - Google Gemini (Google account or AI Studio API billing)
 
 ## What is distinctive
@@ -95,23 +103,33 @@ These are important product features, but not the core differentiation.
 
 ## Install
 
-1. Install [Determinate Nix](https://docs.determinate.systems/determinate-nix/)
-   by following its platform-specific installation instructions.
-
-2. **Copy this prompt to your coding agent to install:**
-
-   ```text
-   Install haskell-agent by running `nix profile add --accept-flake-config github:digitallyinduced/haskell-agent`, then verify the installation by running `monad-cli --help`.
-   ```
-
-   Or install it yourself:
+1. Install [GHCup](https://www.haskell.org/ghcup/) (provides GHC and `cabal`),
+   then:
 
    ```console
-   nix profile add --accept-flake-config github:digitallyinduced/haskell-agent
+   git clone https://github.com/overshiki/haskell-agent.git
+   cd haskell-agent
+   scripts/setup-cabal-build.sh
+   cabal install agent-cli:exe:monad-cli
    ```
 
-   `--accept-flake-config` enables the public IHP binary cache declared by the
-   flake.
+2. Verify the installation:
+
+   ```console
+   monad-cli --help
+   ```
+
+The CLI needs PostgreSQL 14 or newer, with the PostgreSQL tools (`initdb`,
+`pg_ctl`, `psql`) on `PATH`. Older servers are supported through a
+`pgcrypto`-based UUIDv7 fallback, so `pg_catalog.uuidv7()` (PostgreSQL 18+)
+is not required. If the tools are installed outside the default `PATH` (for
+example in `/usr/lib/postgresql/14/bin`), set `AGENT_POSTGRES_BIN` before
+running:
+
+```console
+export AGENT_POSTGRES_BIN=/usr/lib/postgresql/14/bin
+monad-cli
+```
 
 ## Run
 
@@ -128,12 +146,7 @@ persistent `run_ghci` tool when needed:
 monad-cli --ghci
 ```
 
-The GHCi tool is optional and uses a `ghci` executable from `PATH`. Run the
-agent with a Nix-provided GHC when enabling it:
-
-```console
-nix shell nixpkgs#ghc -c monad-cli --ghci
-```
+The GHCi tool is optional and uses a `ghci` executable from `PATH`.
 
 For GHCi-only operation, disable Bash explicitly:
 
@@ -215,8 +228,8 @@ agent-telegram status
 
 The gateway supports durable per-conversation sessions, allowlists,
 multimodal messages, approvals, and concurrent chats. See the
-[Telegram guide](docs/telegram.md) for setup, groups, commands, and NixOS
-deployment. You can also ask the agent to “set up a Telegram agent”.
+[Telegram guide](docs/telegram.md) for setup, groups, and commands.
+You can also ask the agent to “set up a Telegram agent”.
 
 ### Model catalog and local models
 
@@ -369,26 +382,23 @@ portable Responses dialect from the model family.
 
 ## Development
 
-All compiler and package dependencies come from the pinned Nix flake.
-
-```console
-nix develop
-cabal test all
-```
-
-From the development shell, `repl` opens the agent under GHCi. Edit the
-harness, leave the running agent, reload the changed modules, and resume the
-same session without rebuilding the executable.
-
-### Pure Cabal (without Nix)
-
-You can also build with plain `cabal`. Run `scripts/setup-cabal-build.sh` once
-to fetch the patched `vty-unix`, syntax definitions, and bundled model data,
-then build the CLI:
+Dependencies come from Hackage via `cabal`. Run `scripts/setup-cabal-build.sh`
+once to fetch the patched `vty-unix`, syntax definitions, and bundled model
+data, then build and test:
 
 ```console
 scripts/setup-cabal-build.sh
 cabal build agent-cli:exe:monad-cli
+cabal test agent-core
+```
+
+`scripts/repl` opens the agent under GHCi with automatic reload and session
+resume. Edit the harness, leave the running agent (`:q`), and the wrapper
+reloads the changed modules and resumes the same session without rebuilding
+the executable. It requires `expect`:
+
+```console
+scripts/repl
 ```
 
 The CLI needs PostgreSQL 14 or newer, with the PostgreSQL tools (`initdb`,
@@ -404,7 +414,7 @@ cabal run agent-cli:exe:monad-cli
 ```
 
 See [`AGENTS.md`](AGENTS.md) for the complete development workflow, including
-multi-package GHCi sessions, Nix package maintenance, and CLI testing.
+multi-package GHCi sessions and CLI testing.
 
 ## License
 

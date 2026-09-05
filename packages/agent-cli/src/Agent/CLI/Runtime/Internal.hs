@@ -194,7 +194,7 @@ run = do
             case result of
                 DevQuit -> pure ()
                 DevReload _ ->
-                    die ":reload is only available under `repl` (nix develop)"
+                    die ":reload is only available under `scripts/repl`"
 
 -- | Tear down and rebuild provider-specific auth, tools, prompt, and transport.
 -- Automatic transitions carry the exact failed turn in memory and commit

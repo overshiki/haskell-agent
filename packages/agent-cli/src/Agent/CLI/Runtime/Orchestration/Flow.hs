@@ -222,8 +222,6 @@ import System.Environment ()
 import System.Exit ( die )
 import System.IO ( hIsTerminalDevice, stderr, stdin )
 import System.OsPath ( decodeFS, takeDirectory, takeFileName )
-import System.Posix.Process ( executeFile )
-import System.Process ( callProcess )
 import qualified Data.ByteString as BS ()
 import qualified Agent.Responses.GenericClient as GenericResponses
     ()
@@ -409,23 +407,14 @@ runAgentWithRuntime processRuntime runMode options = do
             RunQuit -> pure DevQuit
             RunReload sessionId -> pure (DevReload sessionId)
 
-    updateAndResume sessionId = do
-        callProcess "nix"
-            [ "profile"
-            , "remove"
-            , "haskell-agent"
-            ]
-        callProcess "nix"
-            [ "profile"
-            , "add"
-            , "--accept-flake-config"
-            , "github:digitallyinduced/haskell-agent"
-            ]
-        executeFile
-            "monad-cli"
-            True
-            ["--resume", Text.unpack sessionId]
-            Nothing
+    -- Self-update used to reinstall the Nix profile from the upstream flake.
+    -- This fork ships no Nix packaging, so automatic updates are unavailable;
+    -- fail with upgrade guidance and let the caller restart the session with
+    -- the current binary.
+    updateAndResume _sessionId =
+        ioError
+            (userError
+                "automatic updates are unavailable for this build; upgrade from your source checkout with `cabal install agent-cli:exe:monad-cli` and restart")
 
 -- | Restore the process cwd after an action succeeds or throws. Cabal gives
 -- GHCi relative source paths, so returning from an agent session in its cwd

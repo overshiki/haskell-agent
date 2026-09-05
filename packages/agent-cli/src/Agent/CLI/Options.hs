@@ -696,7 +696,7 @@ usage = unlines
     , "session has been persisted."
     , "Ctrl-C cancels the current turn (or warns at the idle prompt);"
     , "a second Ctrl-C exits."
-    , "Under `repl` (nix develop), first open passes --worktree unless the"
+    , "Under `scripts/repl`, first open passes --worktree unless the"
     , "cwd is already under ~/.haskell-agent/worktrees. :reload returns to"
     , "GHCi, reloads modules, and resumes the same session."
 

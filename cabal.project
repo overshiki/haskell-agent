@@ -24,7 +24,8 @@ packages:
 tests: True
 multi-repl: True
 
--- Keep local Cabal builds on the same Hasql API set as the Nix package set.
+-- Pin the Hasql API set so the resolve plan stays on one major version
+-- across developer machines.
 constraints:
     hasql == 2.0.1.0,
     hasql-pool == 1.5.0.1,

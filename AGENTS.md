@@ -19,12 +19,15 @@ we follow the tool defintions that are used by the first party lab harnesses. e.
 
 # ghci
 
-use ghci instead of compiling the code. E.g. instead of nix flake check start a ghci and load in the necessary modules. This is way faster than doing a full compile.
+use ghci instead of compiling the code. E.g. instead of a full `cabal build`
+round-trip, start a ghci and load in the necessary modules. This is way faster
+than doing a full compile.
 
-From `nix develop`, run `repl` to open the agent under GHCi. It defaults to
-OpenAI `gpt-5.6-sol` with `--yolo`. On first open it passes `--worktree` when
-the cwd is not already under `~/.haskell-agent/worktrees`. Agent `:reload`
-returns to GHCi, reloads modules, and resumes the previous session.
+Run `scripts/repl` to open the agent under GHCi (requires `expect`, e.g.
+`apt-get install expect`). It defaults to OpenAI `gpt-5.6-sol` with `--yolo`.
+On first open it passes `--worktree` when the cwd is not already under
+`~/.haskell-agent/worktrees`. Agent `:reload` returns to GHCi, reloads modules,
+and resumes the previous session.
 
 ## development feedback loop
 
@@ -37,7 +40,6 @@ Load every library you may edit so `:r` recompiles across package boundaries (`a
 `cabal.project` sets `multi-repl: True`, so multiple library targets share one GHCi session by default:
 
 ```
-nix develop
 cabal repl \
   agent-cli:lib:agent-cli \
   agent-telegram:lib:agent-telegram \
@@ -108,33 +110,21 @@ When changing the CLI UI (prompt, colors, chrome, keybindings, paste, approval p
 
 ### memory / RTS heap cap
 
-`nix develop` does not impose a heap ceiling on every development command. The
-`repl` wrapper defaults `GHCRTS` to `-M8G`, which protects the machine from an
-unbounded long-running GHCi/agent process while preserving the RTS allocation
-area default. The compiled `monad-cli` executable defaults to `-N4 -M8G`; four
+The `scripts/repl` wrapper defaults `GHCRTS` to `-M8G`, which caps the
+long-running GHCi/agent process while preserving the RTS allocation area
+default. The compiled `monad-cli` executable defaults to `-N4 -M8G`; four
 capabilities cover concurrent agent work without multiplying the RTS
 allocation area by every host core. Both defaults are overridable because
 `-rtsopts` is enabled. Set `GHCRTS` explicitly to override the wrapper:
 
 ```
-GHCRTS='-M16G' repl
+GHCRTS='-M16G' scripts/repl
 GHCRTS='-M4G' cabal repl agent-cli
 cabal run monad-cli -- +RTS -N8 -M16G -RTS
 ```
 
 Avoid large `-A` defaults: the allocation area is per capability, so
 `-N14 -A64m` consumes roughly 896 MiB before meaningful application data.
-
-## Nix package maintenance
-
-Each package has a checked-in `package.nix` generated with `cabal2nix`; the
-flake does not use import-from-derivation. After changing a package's Cabal
-file, regenerate its expression from the repository root, for example:
-
-```
-(cd packages/claude-agent-sdk-haskell && cabal2nix . > package.nix)
-(cd packages/agent-claude && cabal2nix . > package.nix)
-```
 
 # performance
 
@@ -145,8 +135,8 @@ claimed improvement before opening a PR.
   workloads. Keep a baseline workload in the benchmark so future changes can
   be compared against the behavior being replaced.
 - Use an optimized build rather than interpreted GHCi timings. Run benchmarks
-  inside `nix develop`, force the result so GHC cannot optimize the work away,
-  and enable RTS statistics when measuring allocation.
+  against an optimized (`-O2`) build, force the result so GHC cannot optimize
+  the work away, and enable RTS statistics when measuring allocation.
 - Measure both elapsed/CPU time and allocated bytes when the change is intended
   to reduce allocation or GC pressure. A speedup that shifts work or allocation
   to another stage is not sufficient.
@@ -173,8 +163,8 @@ CPU time and allocation across the requested sample count.
 Build and locate it with:
 
 ```
-nix develop -c cabal build --offline agent-core:bench:streaming-text-bench
-bin=$(nix develop -c cabal list-bin agent-core:bench:streaming-text-bench)
+cabal build --offline agent-core:bench:streaming-text-bench
+bin=$(cabal list-bin agent-core:bench:streaming-text-bench)
 ```
 
 Compare strict repeated append, chunked accumulation, removed-buffer overhead,

@@ -15,7 +15,6 @@ reports median wall time, CPU time, allocated bytes, and live bytes.
 Build the optimized benchmark and run equivalent workloads with:
 
 ```sh
-nix develop
 cabal build --offline --enable-optimization=2 \
   agent-syntax:bench:syntax-loading-bench
 bin=$(cabal list-bin agent-syntax:bench:syntax-loading-bench)
@@ -49,9 +48,8 @@ their XML, then `loadSyntaxLanguage` parses only a requested definition and its
 transitive grammar dependencies. The eager `loadSyntaxHighlighter` API remains
 available for batch callers.
 
-The repository's Nix flake fetches the pinned upstream definitions and
-configures the variable for tests, development shells, and packaged
-executables.
+`scripts/setup-cabal-build.sh` fetches the pinned upstream definitions and
+configures the variable for tests and local builds.
 
 Terminal colors, Brick attributes, Markdown layout, and widget caching remain
 in `agent-tui`.

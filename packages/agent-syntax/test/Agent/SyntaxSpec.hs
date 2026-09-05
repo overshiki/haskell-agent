@@ -177,7 +177,7 @@ sourceSyntaxDirectory =
     lookupEnv "AGENT_SYNTAX_DIR" >>= \case
         Nothing -> do
             expectationFailure
-                "AGENT_SYNTAX_DIR is not set; run tests from nix develop"
+                "AGENT_SYNTAX_DIR is not set; run scripts/setup-cabal-build.sh first"
             fail "unreachable"
         Just syntaxDirectory ->
             pure syntaxDirectory

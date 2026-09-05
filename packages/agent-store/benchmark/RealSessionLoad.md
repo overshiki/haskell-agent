@@ -5,9 +5,9 @@ existing coding session. It reports only the session key, a checksum, timing,
 and Haskell allocation; it does not print transcript contents.
 
 ```console
-nix develop -c cabal build --offline \
+cabal build --offline \
   agent-store:bench:real-session-load-bench
-bin=$(nix develop -c cabal list-bin \
+bin=$(cabal list-bin \
   agent-store:bench:real-session-load-bench)
 "$bin" per-item "$HOME/.haskell-agent" active SESSION_KEY 11 +RTS -T
 "$bin" adaptive "$HOME/.haskell-agent" active SESSION_KEY 11 +RTS -T

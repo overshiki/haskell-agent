@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Open the agent under GHCi with automatic :reload + session resume.
+#
+# This recreates, outside Nix, the `repl` helper that used to live in the
+# flake. It drives `cabal repl lib:agent-cli` through an expect script that
+# waits for the modules to load, starts the agent, and hands the terminal over
+# to you. Inside the agent, :reload returns to GHCi, reloads changed modules,
+# and resumes the previous session.
+#
+# Requires: cabal (on PATH), expect, stty (coreutils), git.
+#
+# Keep this single-component: GHC 9.10 multi-home-unit mode does not support
+# the :module or :cmd commands used below. Use the documented manual
+# multi-package REPL when editing agent-tui or another dependency alongside
+# agent-cli.
+
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+script="$root/scripts/agent-repl.ghci"
+if [ ! -f "$script" ]; then
+    echo "repl: missing $script" >&2
+    exit 1
+fi
+
+# Cap the long-running GHCi/agent process without forcing every other
+# command in the shell to inherit the same limit.
+if [ -z "${GHCRTS:-}" ]; then
+    export GHCRTS="-M8G"
+fi
+
+command -v expect >/dev/null 2>&1 || {
+    echo "repl: expect is not installed (e.g. apt-get install expect)" >&2
+    exit 1
+}
+command -v cabal >/dev/null 2>&1 || {
+    echo "repl: cabal is not on PATH" >&2
+    exit 1
+}
+
+export AGENT_REPL_SCRIPT="$script"
+exec expect -c '
+    set timeout -1
+    set script $env(AGENT_REPL_SCRIPT)
+    spawn -noecho cabal repl lib:agent-cli --repl-options=-ghci-script=$script
+    # Expect gives Cabal/GHCi its own PTY. Keep that PTY in sync so Vty
+    # receives resize events with current bounds.
+    proc sync_spawn_size {} {
+        global spawn_out
+        if {![info exists spawn_out(slave,name)]} {
+            return
+        }
+        if {[catch {
+            exec stty --file=/dev/tty size
+        } size]} {
+            return
+        }
+        if {[scan $size "%d %d" rows columns] != 2
+            || $rows <= 0
+            || $columns <= 0} {
+            return
+        }
+        catch {
+            exec stty --file=$spawn_out(slave,name) rows $rows columns $columns
+        }
+    }
+    trap sync_spawn_size SIGWINCH
+    sync_spawn_size
+    expect {
+        -re {Ok, [0-9]+ modules? loaded\.} {}
+        eof {
+            puts stderr "repl: cabal repl exited before modules loaded"
+            exit 1
+        }
+    }
+    send -- ":module +Agent.CLI\r"
+    expect -re {ghci>}
+    send -- ":cmd afterDev =<< devMain\r"
+    interact
+'

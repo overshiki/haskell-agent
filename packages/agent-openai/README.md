@@ -140,7 +140,7 @@ independent refresh-token family instead of copying another machine's rotating
 credentials:
 
 ```console
-OPENAI_OAUTH_CLIENT_ID=... nix run .#agent-openai-login -- --output /root/.codex/auth.json
+OPENAI_OAUTH_CLIENT_ID=... cabal run agent-openai:exe:agent-openai-login -- --output /root/.codex/auth.json
 ```
 
 Open the printed URL, enter the one-time code, and finish signing in. The
@@ -149,7 +149,6 @@ credentials file is written atomically with mode `0600`.
 ## Development
 
 ```
-nix develop
 cabal build
 cabal repl
 ```

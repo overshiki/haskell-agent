@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Setup a pure-Cabal build environment for haskell-agent.
 #
-# This script recreates, outside Nix, the runtime data and patched dependency
-# that the flake normally provides. It is intentionally conservative: it checks
-# prerequisites, downloads vendored files, patches vty-unix, and writes a
-# cabal.project.local. It does not run sudo commands automatically.
+# This script sets up the runtime data and patched dependency the builds and
+# tests need (the project has no Nix support). It is intentionally
+# conservative: it checks prerequisites, downloads vendored files, patches
+# vty-unix, and writes a cabal.project.local. It does not run sudo commands
+# automatically.
 #
 # Usage:
 #   scripts/setup-cabal-build.sh
@@ -55,12 +56,12 @@ command -v cabal >/dev/null 2>&1 || die "cabal not found in PATH"
 GHC_VERSION="$(ghc --numeric-version)"
 log "GHC version: $GHC_VERSION"
 
-# The CLI package requires base >= 4.17 (GHC 9.4). The flake pins nixpkgs-unstable
-# which currently ships GHC 9.10; use that for best compatibility.
+# The CLI package requires base >= 4.17 (GHC 9.4). GHC 9.10.x is the
+# recommended version for best compatibility.
 case "$GHC_VERSION" in
     9.10.*) ;;
     9.8.*|9.6.*|9.4.*)
-        log "WARNING: GHC $GHC_VERSION may work but GHC 9.10.x is what the flake pins."
+        log "WARNING: GHC $GHC_VERSION may work but GHC 9.10.x is the recommended version."
         ;;
     *)
         die "GHC $GHC_VERSION is too old or untested. Install GHC 9.10.x."
@@ -92,7 +93,7 @@ if command -v bun >/dev/null 2>&1; then
     BUN_VERSION="$(bun --version 2>/dev/null || true)"
     case "$BUN_VERSION" in
         1.4.*) ;;
-        *) log "WARNING: bun version is '$BUN_VERSION'; the flake pins 1.4.x." ;;
+        *) log "WARNING: bun version is '$BUN_VERSION'; the project pins 1.4.x." ;;
     esac
 fi
 

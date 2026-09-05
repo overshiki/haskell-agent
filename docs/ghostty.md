@@ -64,6 +64,6 @@ being coupled to core orchestration.
 ## libghostty
 
 `libghostty` is a candidate terminal engine for future native clients. Keep it
-behind a C FFI package and pin the exact Ghostty revision through the Nix flake;
-its API should not leak into `agent-core`. The CLI does not link it because a
+behind a C FFI package and pin the exact Ghostty revision explicitly; its API
+should not leak into `agent-core`. The CLI does not link it because a
 terminal emulator is unnecessary when the harness already runs inside a PTY.

@@ -7,9 +7,9 @@ CPU time, and allocated bytes after one warm-up query.
 Build and run:
 
 ```sh
-nix develop -c cabal build --offline \
+cabal build --offline \
   agent-store:bench:session-history-paging-bench
-bin=$(nix develop -c cabal list-bin \
+bin=$(cabal list-bin \
   agent-store:bench:session-history-paging-bench)
 TMPDIR=/tmp "$bin" 1000,5000,10000 4096 5 +RTS -T
 TMPDIR=/tmp "$bin" 10000 4096 11 +RTS -T

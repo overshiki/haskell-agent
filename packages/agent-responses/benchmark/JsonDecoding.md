@@ -22,8 +22,8 @@ function, and namespace tools with realistic JSON schemas and a custom grammar.
 Build with optimisation and enable allocation statistics:
 
 ```console
-nix develop -c cabal build -O2 agent-responses:bench:responses-json-bench
-bin=$(nix develop -c cabal list-bin -O2 \
+cabal build -O2 agent-responses:bench:responses-json-bench
+bin=$(cabal list-bin -O2 \
   agent-responses:bench:responses-json-bench)
 "$bin" stream 160 16 9 +RTS -T
 "$bin" stream 160 1024 9 +RTS -T

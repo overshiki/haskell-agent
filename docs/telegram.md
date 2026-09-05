@@ -62,8 +62,3 @@ the agent child.
 The built-in `telegram-agent` skill can guide setup. Ask the normal agent to
 “set up a Telegram agent”.
 
-## NixOS
-
-Use the flake's reusable multi-instance service module instead of maintaining
-the systemd and PostgreSQL runtime configuration by hand. See
-[`nixos.md`](nixos.md).
