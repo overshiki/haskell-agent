@@ -1515,6 +1515,7 @@ testMeta sessionId = SessionMeta
         , legacyTargetDialect = GrokBuildDialect
         }
     , metaCwd = fromFilePath "/tmp/work"
+    , metaGitBranch = Nothing
     , metaEffort = "low"
     , metaTitle = "legacy"
     , metaTitleIsManual = False

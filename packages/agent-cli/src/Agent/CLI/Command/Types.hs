@@ -17,9 +17,11 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 import Data.Text (Text)
 
--- | Parsed @/fork@ options. A missing worktree choice asks interactively.
+-- | Parsed @/fork@ options. A missing worktree choice asks interactively;
+-- @forkBranch@ pins the fork to a new branch in the current checkout instead.
 data ForkRequest = ForkRequest
     { forkWorktree :: !(Maybe Bool)
+    , forkBranch :: !(Maybe Text)
     , forkDirective :: !(Maybe Text)
     }
     deriving (Eq, Show)
@@ -42,6 +44,8 @@ data ReplAction
     | ReplReview (Maybe Text)
     | ReplDiff
     | ReplFork !ForkRequest
+    | ReplCheckout !Text
+    -- ^ Switch to a git branch and resume the chat linked to it.
     | ReplExport (Maybe Text)
     | ReplPermissions
     | ReplShowEffort

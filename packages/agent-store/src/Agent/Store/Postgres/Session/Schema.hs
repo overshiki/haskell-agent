@@ -30,6 +30,7 @@ sessionSchemaStatements =
       \ legacy_target_effective_model text,\
       \ legacy_target_dialect text,\
       \ cwd text NOT NULL,\
+      \ git_branch text,\
       \ effort text NOT NULL,\
       \ title text NOT NULL,\
       \ title_is_manual boolean NOT NULL,\
@@ -66,6 +67,9 @@ sessionSchemaStatements =
       \ )"
     , "CREATE INDEX IF NOT EXISTS sessions_updated_at_idx\
       \ ON harness.sessions (updated_at DESC)\
+      \ WHERE deleted_at IS NULL"
+    , "CREATE INDEX IF NOT EXISTS sessions_cwd_git_branch_updated_at_idx\
+      \ ON harness.sessions (cwd, git_branch, updated_at DESC)\
       \ WHERE deleted_at IS NULL"
     , "CREATE TABLE IF NOT EXISTS harness.session_events (\
       \ event_id uuid PRIMARY KEY DEFAULT harness.uuidv7(),\

@@ -19,7 +19,7 @@ import Agent.CLI.Command
       ForkRequest(..),
       ReplAction(ReplRenameAuto, ReplResume, ReplSearch, ReplHome, ReplRewind, ReplClear,
                  ReplNew, ReplDelete, ReplShowSession, ReplShowSessionInfo, ReplAfk,
-                 ReplWorktree, ReplRename, ReplFork),
+                 ReplWorktree, ReplRename, ReplFork, ReplCheckout),
       ShellMode(ShellNone, ShellGhci, ShellBash, ShellBoth),
       SlashCatalog(slashCatalogToolNames) )
 import Agent.CLI.Compaction ()
@@ -65,7 +65,7 @@ import Agent.CLI.Runtime.Persistence ()
 import Agent.CLI.Runtime.Recap ()
 import Agent.CLI.Runtime.Types
     ( RunResult(RunDeleteSession, RunForkSession, RunSwitchWorktree, RunRestart,
-                RunQuit) )
+                RunCheckoutBranch, RunQuit) )
 import Agent.CLI.Secret ()
 import Agent.CLI.Session
     ( TranscriptEffect(TranscriptReset),
@@ -75,6 +75,7 @@ import Agent.CLI.Session
       forkSessionAt,
       loadSession,
       rewindSession,
+      listSessions,
       removeSessionTemp,
       resetSessionTitleToAuto,
       sessionConversationText,
@@ -90,7 +91,7 @@ import Agent.CLI.Session
       SessionMeta(metaTitle, metaLastResponseId,
                   metaInputTokens, metaOutputTokens, metaCachedTokens, metaLastRecap,
                   metaLastTurnSummary, metaLastRecapMainTurns, metaTransportModel,
-                  metaTitleUserTurns, metaId, metaCwd),
+                  metaTitleUserTurns, metaId, metaCwd, metaGitBranch, metaUpdatedAt),
       SessionTransfer(transferTurns, SessionTransfer, transferMeta),
       SessionTurn(turnUsage, SessionTurn, turnAt, turnUserText,
                   turnAssistantText, turnError, turnResponseId, turnEffect,
@@ -131,6 +132,7 @@ import Agent.CLI.Usage ()
 import Agent.CLI.WebFetch ()
 import Agent.CLI.Worktree
     ( createManagedWorktreeWithProgress
+    , git
     , removeWorktree
     , worktreeProgressMessage
     )
@@ -147,7 +149,7 @@ import Agent.OpenAI.Compaction
 import Agent.OpenAI.Usage ()
 import Agent.OpenAI.WebSocketClient ()
 import Agent.OpenRouter.LoopBackend ()
-import Agent.OsPath ( toText )
+import Agent.OsPath ( fromText, normalizeLexically, toText )
 import Agent.Provider ( providerSlug )
 import Agent.ReasoningEffort (reasoningEffortText)
 import Agent.Responses.GenericBackend ()
@@ -178,7 +180,7 @@ import Control.Exception ()
 import Control.Exception.Safe ( finally, mask, onException )
 import Control.Monad ( forM_, void )
 import Data.IORef ( readIORef, writeIORef )
-import Data.List ()
+import Data.List ( foldl' )
 import Data.Maybe ( fromMaybe )
 import Data.Text ()
 import Data.Time.Clock ( getCurrentTime )
@@ -203,7 +205,8 @@ import qualified Agent.CLI.Session.Lifecycle as SessionLifecycle ()
 import qualified Agent.CLI.Session.Runner as SessionRunner ()
 import qualified Data.Set as Set ( toAscList )
 import qualified Data.Text as Text
-    ( intercalate, length, pack, strip, take, unlines, unwords, words )
+    ( intercalate, isPrefixOf, length, pack, strip, take, unpack,
+      unlines, unwords, words )
 import qualified Data.Text.IO as Text ( putStrLn, hPutStrLn )
 import qualified Agent.XAI.Options as XAI ()
 import qualified Agent.XAI.Usage as XAIUsage ()
@@ -505,75 +508,83 @@ handleSessionAction
                         failFork
                             "/fork is available after the first persisted turn"
                     PersistenceActive source ->
-                        chooseForkWorktree color request.forkWorktree >>= \case
-                            Nothing -> continue
-                            Just useWorktree -> mask \restore -> do
-                                destination <-
-                                    restore $
-                                        if useWorktree
-                                            then
-                                                withReplActivity \report ->
-                                                    createManagedWorktreeWithProgress
-                                                        (report
-                                                            . worktreeProgressMessage)
-                                                        env.sessionHome
-                                                        source.sessionMeta.metaCwd
-                                                    >>= pure . fmap
-                                                        (\path ->
-                                                            (path, Just path))
-                                            else
-                                                pure
-                                                    (Right
-                                                        ( source.sessionMeta.metaCwd
-                                                        , Nothing
-                                                        ))
-                                case destination of
-                                    Left err -> failFork err
-                                    Right (newCwd, worktreePath) -> do
-                                        let root =
-                                                takeDirectory source.sessionDir
-                                            cleanup =
-                                                cleanupForkWorktree
-                                                    source.sessionMeta.metaCwd
-                                                    worktreePath
-                                        result <-
-                                            restore
-                                                (withReplActivity \report -> do
-                                                    report "Forking session…"
-                                                    loadSession
-                                                        databasePool
-                                                        root
-                                                        source.sessionMeta.metaId
-                                                        >>= \case
-                                                            Left err ->
-                                                                pure (Left err)
-                                                            Right (meta, turns) ->
-                                                                forkSessionAt
-                                                                    root
-                                                                    source
-                                                                        { sessionMeta =
-                                                                            meta
-                                                                        }
-                                                                    turns
-                                                                    Nothing
-                                                                    newCwd)
-                                                `onException` cleanup
-                                        case result of
-                                            Left err -> do
-                                                cleanup
-                                                failFork err
-                                            Right forked -> do
-                                                let message =
-                                                        "forked session: "
-                                                            <> forked.sessionMeta.metaId
-                                                displayInfo message $
-                                                    putTextLn stderr
-                                                        (roleMuted color
-                                                            (glyphOk <> message))
-                                                pure
-                                                    (RunForkSession
-                                                        forked.sessionMeta.metaId
-                                                        request.forkDirective)
+                        case request.forkBranch of
+                            Just branch ->
+                                forkSessionOnBranch color source request branch
+                            Nothing ->
+                                chooseForkWorktree color request.forkWorktree >>= \case
+                                    Nothing -> continue
+                                    Just useWorktree -> mask \restore -> do
+                                        destination <-
+                                            restore $
+                                                if useWorktree
+                                                    then
+                                                        withReplActivity \report ->
+                                                            createManagedWorktreeWithProgress
+                                                                (report
+                                                                    . worktreeProgressMessage)
+                                                                env.sessionHome
+                                                                source.sessionMeta.metaCwd
+                                                            >>= pure . fmap
+                                                                (\path ->
+                                                                    (path, Just path))
+                                                    else
+                                                        pure
+                                                            (Right
+                                                                ( source.sessionMeta.metaCwd
+                                                                , Nothing
+                                                                ))
+                                        case destination of
+                                            Left err -> failFork err
+                                            Right (newCwd, worktreePath) -> do
+                                                let root =
+                                                        takeDirectory source.sessionDir
+                                                    cleanup =
+                                                        cleanupForkWorktree
+                                                            source.sessionMeta.metaCwd
+                                                            worktreePath
+                                                result <-
+                                                    restore
+                                                        (withReplActivity \report -> do
+                                                            report "Forking session…"
+                                                            loadSession
+                                                                databasePool
+                                                                root
+                                                                source.sessionMeta.metaId
+                                                                >>= \case
+                                                                    Left err ->
+                                                                        pure (Left err)
+                                                                    Right (meta, turns) ->
+                                                                        forkSessionAt
+                                                                            root
+                                                                            source
+                                                                                { sessionMeta =
+                                                                                    meta
+                                                                                }
+                                                                            turns
+                                                                            Nothing
+                                                                            newCwd
+                                                                            Nothing)
+                                                        `onException` cleanup
+                                                case result of
+                                                    Left err -> do
+                                                        cleanup
+                                                        failFork err
+                                                    Right forked -> do
+                                                        let message =
+                                                                "forked session: "
+                                                                    <> forked.sessionMeta.metaId
+                                                        displayInfo message $
+                                                            putTextLn stderr
+                                                                (roleMuted color
+                                                                    (glyphOk <> message))
+                                                        pure
+                                                            (RunForkSession
+                                                                forked.sessionMeta.metaId
+                                                                request.forkDirective)
+    ReplCheckout branch -> do
+        color <- resolveColor stderr
+        checkoutSessionBranch color branch
     ReplShowSession -> do
         color <- resolveColor stdout
         case persist of
@@ -860,6 +871,131 @@ handleSessionAction
         case fullscreen of
             Nothing -> clearThinking render
             Just runtime -> emitUiEvent runtime (UiSetNotice Nothing)
+    -- | @/fork --branch@: create the branch in the current checkout (when it
+    -- is a git repo) and link the in-place fork to it. Outside a repo the
+    -- name degrades to the fork title. A failed repo probe, an existing
+    -- branch, or a failed checkout aborts the fork before it starts.
+    forkSessionOnBranch color source request branch = do
+        let failFork message = do
+                displayError message $
+                    putTextLn stderr (roleError color message)
+                continue
+            finish gitBranch =
+                mask \restore -> do
+                    let root = takeDirectory source.sessionDir
+                    result <-
+                        restore
+                            (withReplActivity \report -> do
+                                report "Forking session…"
+                                loadSession
+                                    databasePool
+                                    root
+                                    source.sessionMeta.metaId
+                                    >>= \case
+                                        Left err -> pure (Left err)
+                                        Right (meta, turns) ->
+                                            forkSessionAt
+                                                root
+                                                source { sessionMeta = meta }
+                                                turns
+                                                (Just
+                                                    (fromMaybe
+                                                        branch
+                                                        request.forkDirective))
+                                                source.sessionMeta.metaCwd
+                                                gitBranch)
+                    case result of
+                        Left err -> failFork err
+                        Right forked -> do
+                            let message =
+                                    "forked session: "
+                                        <> forked.sessionMeta.metaId
+                            displayInfo message $
+                                putTextLn stderr
+                                    (roleMuted color (glyphOk <> message))
+                            pure
+                                (RunForkSession
+                                    forked.sessionMeta.metaId
+                                    request.forkDirective)
+        repo <-
+            git source.sessionMeta.metaCwd ["rev-parse", "--is-inside-work-tree"]
+        case fmap Text.strip repo of
+            Right "true" -> do
+                exists <-
+                    git
+                        source.sessionMeta.metaCwd
+                        [ "rev-parse"
+                        , "--verify"
+                        , "--quiet"
+                        , "refs/heads/" <> Text.unpack branch
+                        ]
+                case exists of
+                    Right _ ->
+                        failFork ("branch '" <> branch <> "' already exists")
+                    Left _ -> do
+                        checkedOut <-
+                            git
+                                source.sessionMeta.metaCwd
+                                ["checkout", "-b", Text.unpack branch]
+                        case checkedOut of
+                            Left err -> failFork err
+                            Right _ -> finish (Just branch)
+            _ -> finish Nothing
+    -- | @/checkout@: switch the repo first so a failed git operation never
+    -- moves the conversation, then hand the flow the newest session linked to
+    -- the branch inside the project root (or 'Nothing' so it starts a fresh
+    -- session on the now-checked-out branch).
+    checkoutSessionBranch color branch = do
+        let failCheckout message = do
+                displayError message $
+                    putTextLn stderr (roleError color message)
+                continue
+        repo <- git cwd ["rev-parse", "--is-inside-work-tree"]
+        case fmap Text.strip repo of
+            Right "true" -> do
+                projectRoot <- git cwd ["rev-parse", "--show-toplevel"]
+                case projectRoot of
+                    Left err -> failCheckout err
+                    Right out -> do
+                        checkedOut <- git cwd ["checkout", Text.unpack branch]
+                        case checkedOut of
+                            Left err -> failCheckout err
+                            Right _ -> do
+                                (metas, _warnings) <-
+                                    listSessions
+                                        databasePool
+                                        (sessionsRoot env.sessionHome)
+                                pure
+                                    (RunCheckoutBranch
+                                        branch
+                                        (latestBranchSession
+                                            (normalizeLexically
+                                                (fromText (Text.strip out)))
+                                            branch
+                                            metas))
+            _ -> failCheckout "not a git repository"
+    -- | Newest session linked to @branch@ whose cwd sits inside
+    -- @projectRoot@, comparing normalized spellings. Containment is a naive
+    -- lexical prefix with a trailing path-separator boundary.
+    latestBranchSession projectRoot branch metas =
+        case filter matches metas of
+            [] -> Nothing
+            first : rest -> Just (foldl' newer first rest).metaId
+      where
+        rootText = toText projectRoot
+        matches meta =
+            meta.metaGitBranch == Just branch
+                && pathWithin rootText
+                    (toText (normalizeLexically meta.metaCwd))
+        newer newerMeta olderMeta
+            | newerMeta.metaUpdatedAt >= olderMeta.metaUpdatedAt = newerMeta
+            | otherwise = olderMeta
+        pathWithin root candidate =
+            candidate == root
+                || rootWithSep root `Text.isPrefixOf` candidate
+        rootWithSep root
+            | root == "/" = "/"
+            | otherwise = root <> "/"
     chooseForkWorktree color = \case
         Just value -> pure (Just value)
         Nothing ->

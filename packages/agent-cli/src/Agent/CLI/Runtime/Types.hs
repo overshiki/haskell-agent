@@ -41,6 +41,10 @@ data RunResult
       -- backend shuts down before starting the selected session.
     | RunForkSession Text (Maybe Text)
       -- ^ A newly forked session plus an optional first interactive prompt.
+    | RunCheckoutBranch !Text !(Maybe Text)
+      -- ^ A branch just checked out plus the newest session linked to it, if
+      -- any. The linked session is resumed so chat and repo stay in step;
+      -- without one the caller starts a fresh session on that branch.
     | RunDeleteSession Text OsPath
       -- ^ Delete this session only after its backend and lock have shut down,
       -- then return to a fresh conversation in the same working directory.

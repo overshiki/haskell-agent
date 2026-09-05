@@ -288,6 +288,45 @@ runAgentWithRuntime processRuntime runMode options = do
                             , optResume = Just (Just sessionId)
                             }
                         Nothing
+            RunCheckoutBranch branch maybeSessionId -> do
+                color <- resolveColor runMode.runStderr
+                putTextLn runMode.runStderr
+                    (roleMuted color
+                        (glyphSession
+                            <> "switching to branch '"
+                            <> branch
+                            <> "'…"))
+                newSessionState >>= \nextState ->
+                    case maybeSessionId of
+                        Just sessionId ->
+                            go fullscreenInputs nextState
+                                current
+                                    { optProvider = Nothing
+                                    , optModel = Nothing
+                                    , optCwd = Nothing
+                                    , optWorktree = False
+                                    , optEffort = Nothing
+                                    , optPrompt = Nothing
+                                    , optPromptFile = Nothing
+                                    , optResume = Just (Just sessionId)
+                                    }
+                                Nothing
+                        Nothing -> do
+                            putTextLn runMode.runStderr
+                                (roleMuted color
+                                    ("no chat linked to branch '"
+                                        <> branch
+                                        <> "' — starting a fresh session"))
+                            go fullscreenInputs nextState
+                                current
+                                    { optCwd = Nothing
+                                    , optWorktree = False
+                                    , optPrompt = Nothing
+                                    , optPromptFile = Nothing
+                                    , optManagedTurnFile = Nothing
+                                    , optResume = Nothing
+                                    }
+                                Nothing
             RunDeleteSession sessionId cwd -> do
                 home <- getHomeDirectory
                 config <- managedPostgresConfigForHome home

@@ -328,6 +328,7 @@ sampleMeta sid title =
             , legacyTargetDialect = GrokBuildDialect
             }
         , metaCwd = fromFilePath "/tmp/repo"
+        , metaGitBranch = Nothing
         , metaEffort = "high"
         , metaTitle = title
         , metaTitleIsManual = False

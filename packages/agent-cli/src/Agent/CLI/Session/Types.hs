@@ -75,6 +75,7 @@ data SessionMeta = SessionMeta
     , metaDialect :: !DialectId
     , metaLegacySubagentTarget :: !(Maybe LegacySubagentTarget)
     , metaCwd :: !OsPath
+    , metaGitBranch :: !(Maybe Text)
     , metaEffort :: !Text
     , metaTitle :: !Text
     , metaTitleIsManual :: !Bool
@@ -241,6 +242,7 @@ instance ToJSON SessionMeta where
         , "dialect" .= dialectSlug meta.metaDialect
         , "legacySubagentTarget" .= meta.metaLegacySubagentTarget
         , "cwd" .= unsafeToFilePath meta.metaCwd
+        , "gitBranch" .= meta.metaGitBranch
         , "effort" .= meta.metaEffort
         , "title" .= meta.metaTitle
         , "titleIsManual" .= meta.metaTitleIsManual
@@ -292,6 +294,7 @@ sessionMetaDecoder = Hermes.object do
             <*> pure dialect
             <*> optionalKey "legacySubagentTarget" legacySubagentTargetDecoder
             <*> (unsafeEncodeUtf <$> Hermes.atKey "cwd" Hermes.string)
+            <*> optionalKey "gitBranch" Hermes.text
             <*> Hermes.atKey "effort" Hermes.text
             <*> Hermes.atKey "title" Hermes.text
             <*> Hermes.defaultKey False "titleIsManual" Hermes.bool

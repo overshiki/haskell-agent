@@ -11,7 +11,8 @@ slashCommands =
     , cmd "init" [] "/init" "Create an AGENTS.md contributor guide" False
     , cmd "review" [] "/review [INSTRUCTIONS]" "Review current changes and find issues" True
     , cmd "diff" [] "/diff" "Show Git diff, including untracked files" False
-    , cmd "fork" [] "/fork [--worktree|--no-worktree] [DIRECTIVE]" "Fork the current chat into a peer session" True
+    , cmd "fork" [] "/fork [--worktree|--no-worktree] [--branch <name>] [DIRECTIVE]" "Fork the current chat into a peer session" True
+    , cmd "checkout" [] "/checkout <branch>" "Switch to a git branch and resume the chat linked to it" True
     , cmd "export" [] "/export [PATH]" "Export the conversation as Markdown" True
     , cmd "history" [] "/history" "Search prompt history and reuse a prompt" False
     , cmd "find" [] "/find [TEXT]" "Search this conversation in a pager" True

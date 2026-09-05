@@ -203,6 +203,29 @@ coreMigrations =
               \ NOT NULL DEFAULT TRUE"
             ]
         }
+    , Migration
+        { migrationVersion = 105
+        , migrationName = "session git branch link"
+        , migrationStatements =
+            [ "ALTER TABLE IF EXISTS harness.sessions\
+              \ ADD COLUMN IF NOT EXISTS git_branch text"
+            , "DO $ha$\
+              \ BEGIN\
+              \   IF EXISTS (\
+              \     SELECT 1 FROM information_schema.columns\
+              \     WHERE table_schema = 'harness'\
+              \       AND table_name = 'sessions'\
+              \       AND column_name = 'cwd'\
+              \   ) THEN\
+              \     CREATE INDEX IF NOT EXISTS\
+              \       sessions_cwd_git_branch_updated_at_idx\
+              \       ON harness.sessions (cwd, git_branch, updated_at DESC)\
+              \       WHERE deleted_at IS NULL;\
+              \   END IF;\
+              \ END\
+              \ $ha$"
+            ]
+        }
     ]
 
 -- Version 1 shipped only on the in-development PostgreSQL branch. Empty

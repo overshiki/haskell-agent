@@ -167,6 +167,7 @@ seedBenchmarkSession store sessionKey turnCount activeTurns payloadBytes = do
             , sessionMetadataDialect = "codex"
             , sessionMetadataLegacyTarget = Nothing
             , sessionMetadataCwd = "/benchmark"
+            , sessionMetadataGitBranch = Nothing
             , sessionMetadataEffort = "medium"
             , sessionMetadataTitle = "Session history benchmark"
             , sessionMetadataTitleIsManual = False

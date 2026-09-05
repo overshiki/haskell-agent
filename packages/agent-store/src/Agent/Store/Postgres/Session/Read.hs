@@ -478,7 +478,7 @@ metadataSelectSql =
     \ provider, connection_id, model_id, transport_model_id, dialect,\
     \ legacy_target_provider, legacy_target_connection,\
     \ legacy_target_effective_model, legacy_target_dialect,\
-    \ cwd, effort, title, title_is_manual, title_refresh_index,\
+    \ cwd, git_branch, effort, title, title_is_manual, title_refresh_index,\
     \ title_user_turns, last_response_id, input_tokens, output_tokens,\
     \ cached_tokens, last_recap, last_turn_summary, last_recap_main_turns\
     \ FROM harness.sessions"
@@ -758,6 +758,7 @@ metadataRow =
             <*> Decoders.column (Decoders.nullable Decoders.text)
             <*> Decoders.column (Decoders.nullable Decoders.text))
         <*> Decoders.column (Decoders.nonNullable Decoders.text)
+        <*> Decoders.column (Decoders.nullable Decoders.text)
         <*> Decoders.column (Decoders.nonNullable Decoders.text)
         <*> Decoders.column (Decoders.nonNullable Decoders.text)
         <*> Decoders.column (Decoders.nonNullable Decoders.bool)

@@ -240,6 +240,9 @@ parseSlash catalog raw line = case Text.words line of
             "fork" ->
                 parseForkCommand
                     (Text.strip (Text.drop (Text.length command) line))
+            "checkout" ->
+                parseCheckoutCommand
+                    (Text.strip (Text.drop (Text.length command) line))
             "export" ->
                 let path = Text.strip (Text.drop (Text.length command) line)
                 in ReplExport
@@ -586,12 +589,14 @@ parseDeepResearchCommand original query
 
 parseForkCommand :: Text -> ReplAction
 parseForkCommand input =
-    either ReplCommandError ReplFork (go Nothing (Text.stripStart input))
+    either ReplCommandError ReplFork (go Nothing Nothing (Text.stripStart input))
   where
-    go worktree rest
+    cannotCombine = "cannot combine --worktree and --branch"
+    go worktree branch rest
         | Text.null rest =
             Right ForkRequest
                 { forkWorktree = worktree
+                , forkBranch = branch
                 , forkDirective = Nothing
                 }
         | otherwise =
@@ -600,23 +605,48 @@ parseForkCommand input =
                 finish =
                     Right ForkRequest
                         { forkWorktree = worktree
+                        , forkBranch = branch
                         , forkDirective = nonEmptyText (Text.strip rest)
                         }
+                branchFlag = case branch of
+                    Just _ -> Left "--branch specified twice"
+                    Nothing -> case worktree of
+                        Just True -> Left cannotCombine
+                        _ ->
+                            let (name, afterName) = Text.break isSpace remaining
+                            in if Text.null name
+                                then Left "--branch requires a branch name"
+                                else go worktree
+                                    (Just name)
+                                    (Text.stripStart afterName)
             in case token of
                 "--worktree" -> case worktree of
-                    Nothing -> go (Just True) remaining
+                    Nothing -> case branch of
+                        Nothing -> go (Just True) branch remaining
+                        Just _ -> Left cannotCombine
                     Just True -> Left "--worktree specified twice"
                     Just False ->
                         Left
                             "--worktree and --no-worktree are mutually exclusive"
                 "--no-worktree" -> case worktree of
-                    Nothing -> go (Just False) remaining
+                    Nothing -> go (Just False) branch remaining
                     Just False -> Left "--no-worktree specified twice"
                     Just True ->
                         Left
                             "--worktree and --no-worktree are mutually exclusive"
+                "--branch" -> branchFlag
+                "-b" -> branchFlag
                 "--at" -> Left "--at is not supported in this version"
                 _ -> finish
+
+parseCheckoutCommand :: Text -> ReplAction
+parseCheckoutCommand input =
+    case Text.words input of
+        [branch]
+            | Text.null (Text.strip branch) ->
+                ReplCommandError "usage: /checkout <branch>"
+            | otherwise -> ReplCheckout branch
+        _ -> ReplCommandError "usage: /checkout <branch>"
 
 parseCopyCommand :: Text -> ReplAction
 parseCopyCommand input
@@ -917,7 +947,7 @@ argCompletions catalog spec = case spec.slashName of
         map (.slashName) catalog.slashCatalogCommands
             <> map (.skillCommandName) catalog.slashCatalogSkills
     "rename" -> ["--auto"]
-    "fork" -> ["--worktree", "--no-worktree"]
+    "fork" -> ["--worktree", "--no-worktree", "--branch", "-b"]
     "paste" -> ["--send"]
     "goal" -> ["status", "pause", "resume", "clear"]
     "workflow" -> ["runs"]

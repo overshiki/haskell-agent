@@ -523,10 +523,12 @@ insertSessionStatement = mkStatement
     \ legacy_target_effective_model, legacy_target_dialect,\
     \ cwd, effort, title, title_is_manual, title_refresh_index,\
     \ title_user_turns, last_response_id, input_tokens, output_tokens,\
-    \ cached_tokens, last_recap, last_turn_summary, last_recap_main_turns\
+    \ cached_tokens, last_recap, last_turn_summary, last_recap_main_turns,\
+    \ git_branch\
     \ ) VALUES (\
     \ $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,\
-    \ $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26\
+    \ $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,\
+    \ $27\
     \ ) RETURNING session_id::text"
     metadataParams
     (Decoders.singleRow (Decoders.column (Decoders.nonNullable Decoders.text)))
@@ -575,7 +577,7 @@ metadataUpdateSql =
     \ title_refresh_index = $18, title_user_turns = $19,\
     \ last_response_id = $20, input_tokens = $21, output_tokens = $22,\
     \ cached_tokens = $23, last_recap = $24, last_turn_summary = $25,\
-    \ last_recap_main_turns = $26"
+    \ last_recap_main_turns = $26, git_branch = $27"
 
 insertEventStatement :: Statement EventInsert Text
 insertEventStatement = mkStatement
@@ -717,6 +719,7 @@ metadataParams =
     <> ((.sessionMetadataLastRecap) >$< Encoders.param (Encoders.nullable Encoders.text))
     <> ((.sessionMetadataLastTurnSummary) >$< Encoders.param (Encoders.nullable Encoders.text))
     <> ((.sessionMetadataLastRecapMainTurns) >$< Encoders.param (Encoders.nonNullable Encoders.int8))
+    <> ((.sessionMetadataGitBranch) >$< Encoders.param (Encoders.nullable Encoders.text))
   where
     legacyField
         :: (SessionLegacyTarget -> Text)

@@ -117,6 +117,7 @@ testMeta = SessionMeta
     , metaDialect = CodexDialect
     , metaLegacySubagentTarget = Nothing
     , metaCwd = unsafeEncodeUtf "."
+    , metaGitBranch = Nothing
     , metaEffort = "medium"
     , metaTitle = "Test session"
     , metaTitleIsManual = False

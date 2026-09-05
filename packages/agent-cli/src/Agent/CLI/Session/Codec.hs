@@ -117,6 +117,7 @@ toStoredMetadata meta = Store.SessionMetadata
     , sessionMetadataLegacyTarget =
         toStoredLegacyTarget <$> meta.metaLegacySubagentTarget
     , sessionMetadataCwd = Text.pack (unsafeToFilePath meta.metaCwd)
+    , sessionMetadataGitBranch = meta.metaGitBranch
     , sessionMetadataEffort = meta.metaEffort
     , sessionMetadataTitle = meta.metaTitle
     , sessionMetadataTitleIsManual = meta.metaTitleIsManual
@@ -236,6 +237,7 @@ fromStoredMetadata stored = do
         , metaLegacySubagentTarget = legacyTarget
         , metaCwd =
             unsafeEncodeUtf (Text.unpack stored.sessionMetadataCwd)
+        , metaGitBranch = stored.sessionMetadataGitBranch
         , metaEffort = stored.sessionMetadataEffort
         , metaTitle = stored.sessionMetadataTitle
         , metaTitleIsManual = stored.sessionMetadataTitleIsManual

@@ -315,6 +315,7 @@ testMetadata now = SessionMetadata
     , sessionMetadataDialect = "openai"
     , sessionMetadataLegacyTarget = Nothing
     , sessionMetadataCwd = "/tmp/project"
+    , sessionMetadataGitBranch = Nothing
     , sessionMetadataEffort = "medium"
     , sessionMetadataTitle = "skill test"
     , sessionMetadataTitleIsManual = False

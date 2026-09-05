@@ -12,6 +12,7 @@ module Agent.CLI.Worktree
     , acquireWorktreeLease
     , releaseWorktreeLease
     , isUnderWorktreeRoot
+    , git
     , worktreeProgressMessage
     , worktreePath
     , worktreeRoot

@@ -92,6 +92,7 @@ data SessionMetadata = SessionMetadata
     , sessionMetadataDialect :: !Text
     , sessionMetadataLegacyTarget :: !(Maybe SessionLegacyTarget)
     , sessionMetadataCwd :: !Text
+    , sessionMetadataGitBranch :: !(Maybe Text)
     , sessionMetadataEffort :: !Text
     , sessionMetadataTitle :: !Text
     , sessionMetadataTitleIsManual :: !Bool

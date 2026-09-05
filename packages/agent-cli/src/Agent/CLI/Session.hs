@@ -404,18 +404,20 @@ forkSession root source turns requestedTitle =
         turns
         requestedTitle
         source.sessionMeta.metaCwd
+        source.sessionMeta.metaGitBranch
 
--- | Clone a persisted session while selecting the fork's working directory.
--- This is used by @/fork --worktree@; ordinary callers retain the source cwd
--- through 'forkSession'.
+-- | Clone a persisted session while selecting the fork's working directory
+-- and git branch link. This is used by @/fork --worktree@; ordinary callers
+-- retain the source cwd and branch through 'forkSession'.
 forkSessionAt
     :: OsPath
     -> SessionHandle
     -> [SessionTurn]
     -> Maybe Text
     -> OsPath
+    -> Maybe Text
     -> IO (Either Text SessionHandle)
-forkSessionAt root source turns requestedTitle targetCwd
+forkSessionAt root source turns requestedTitle targetCwd gitBranch
     | not (any substantiveTurn (activeTranscriptTurns turns)) =
         pure (Left "a session must contain at least one turn before it can be forked")
     | otherwise = mask \restore -> do
@@ -436,6 +438,7 @@ forkSessionAt root source turns requestedTitle targetCwd
                                     sessionId
                                     requestedTitle
                                     targetCwd
+                                    gitBranch
                                     source.sessionMeta
                             storedMeta = toStoredMetadata meta
                             handle = SessionHandle
@@ -506,14 +509,16 @@ forkedMetadata
     -> Text
     -> Maybe Text
     -> OsPath
+    -> Maybe Text
     -> SessionMeta
     -> SessionMeta
-forkedMetadata now sessionId requestedTitle targetCwd source =
+forkedMetadata now sessionId requestedTitle targetCwd gitBranch source =
     source
         { metaId = sessionId
         , metaCreatedAt = now
         , metaUpdatedAt = now
         , metaCwd = targetCwd
+        , metaGitBranch = gitBranch
         , metaTitle = title
         , metaTitleIsManual =
             maybe source.metaTitleIsManual (const True) normalizedTitle
@@ -664,6 +669,7 @@ createReservedSession spec sessionId tempDir promptSnapshot = do
                 , legacyTargetDialect = spec.createTarget.targetDialect
                 }
             , metaCwd = spec.createCwd
+            , metaGitBranch = Nothing
             , metaEffort = spec.createEffort
             , metaTitle = title
             , metaTitleIsManual = spec.createTitleIsManual
